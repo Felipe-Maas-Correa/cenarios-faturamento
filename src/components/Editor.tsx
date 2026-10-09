@@ -229,7 +229,6 @@ export function Editor({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const saveTxt = { idle: "Alterações são salvas automaticamente", saving: "Salvando…", saved: "Tudo salvo", error: "Não foi possível salvar" }[saveState];
 
   if (typeof document === "undefined") return null;
   // portal: o painel precisa ficar acima do cabeçalho, fora do contexto de empilhamento da página
@@ -410,8 +409,8 @@ export function Editor({
         </div>
 
         <div className="drawer-foot">
-          <span className={`status${saveState === "error" ? " err" : ""}`} role="status">
-            {saveTxt}
+          <span className="status err" role="alert" hidden={saveState !== "error"}>
+            Não foi possível salvar. Verifique a conexão.
           </span>
           <button type="button" className="btn" onClick={onClose}>
             <Icon name="check" size={16} /> Concluir

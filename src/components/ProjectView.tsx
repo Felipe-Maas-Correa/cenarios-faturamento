@@ -81,14 +81,15 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
     router.push("/");
   }
 
-  const saveTxt = { idle: "", saving: "Salvando…", saved: "Salvo", error: "Não foi possível salvar. Tente de novo em instantes." }[saveState];
 
   return (
     <main className={`section${painel === "aberto" ? " com-painel" : ""}`} style={{ gap: 28 }}>
       <header>
         <div className="btn-row">
           <Link className="btn ghost sm" href="/"><Icon name="left" size={12} className="arrow" /> Todos os projetos</Link>
-          <span className={`status${saveState === "error" ? " err" : ""}`} role="status">{saveTxt}</span>
+          {saveState === "error" && (
+            <span className="status err" role="alert">Não foi possível salvar. Verifique a conexão.</span>
+          )}
         </div>
 
         <div className="proj-head">

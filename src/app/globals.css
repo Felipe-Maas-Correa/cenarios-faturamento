@@ -423,3 +423,13 @@ input[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 3px var(--ac
   .rcard{transition:border-color .25s,background-color .25s,box-shadow .25s,transform .2s var(--ease-out)}
   .rcard:active{transform:scale(.98)}
 }
+
+/* cabeçalho do projeto com layout estável: o texto do subtítulo não muda a posição dos botões */
+main.section{container-type:inline-size}
+.proj-head{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:16px 24px}
+.proj-head h1{overflow-wrap:anywhere}
+.drawer-foot{justify-content:flex-end}
+@container (max-width:640px){
+  .proj-head{grid-template-columns:minmax(0,1fr)}
+}
+.status{user-select:none}
