@@ -110,4 +110,77 @@ textarea.big-ta{width:100%;min-height:90px;font-size:.86rem}
 .title-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .title-row.between{justify-content:space-between}
 footer{font-size:.78rem;color:var(--muted);border-top:1px solid var(--line);padding-top:14px}
-@media (prefers-reduced-motion:no-preference){.card,.pcard{transition:border-color .2s}}
+
+/* ---------- animações (desligadas se o sistema pedir menos movimento) ---------- */
+@media (prefers-reduced-motion:no-preference){
+  @keyframes fade-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes fade-in{from{opacity:0}to{opacity:1}}
+  @keyframes slide-in{from{opacity:0;transform:translateX(-12px)}to{opacity:1;transform:none}}
+  @keyframes pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
+  @keyframes pulse-ring{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--good) 45%,transparent)}100%{box-shadow:0 0 0 14px transparent}}
+  @keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+  @keyframes bar-in{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes drop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+  /* topo e entrada de página */
+  .site-head{position:relative}
+  .site-head::before{content:"";position:absolute;inset:-4px 0 auto 0;height:4px;background:var(--brand);transform-origin:left;animation:bar-in .8s cubic-bezier(.2,.8,.2,1) both}
+  .site-head{border-top-color:transparent}
+  .site-head img{transition:transform .3s cubic-bezier(.2,.8,.2,1),filter .3s}
+  .site-head a:hover img{transform:scale(1.04) rotate(-.6deg);filter:drop-shadow(0 4px 8px rgba(237,28,36,.25))}
+  .wrap>main{animation:fade-in .35s ease both}
+  h1{animation:slide-in .5s cubic-bezier(.2,.8,.2,1) both}
+
+  /* botões */
+  .btn{position:relative;overflow:hidden;transition:transform .15s cubic-bezier(.2,.8,.2,1),box-shadow .2s,background-color .2s,color .2s,border-color .2s}
+  .btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 16px -6px rgba(200,20,27,.55)}
+  .btn:active:not(:disabled){transform:translateY(0) scale(.97);box-shadow:none}
+  .btn:not(.ghost):not(.danger):hover:not(:disabled){background:var(--brand);border-color:var(--brand)}
+  .btn.ghost:hover:not(:disabled){background:var(--accent-soft)}
+  .btn.danger:hover:not(:disabled){background:var(--bad);color:#fff;box-shadow:0 6px 16px -6px rgba(200,20,27,.55)}
+  .btn::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.35) 50%,transparent 70%);background-size:200% 100%;background-position:-200% 0;pointer-events:none}
+  .btn:not(.ghost):not(.danger):hover:not(:disabled)::after{animation:shimmer .9s ease}
+  .chip{transition:transform .15s,background-color .2s,border-color .2s,color .2s,box-shadow .2s}
+  .chip:hover{transform:translateY(-2px);box-shadow:0 4px 12px -6px rgba(35,31,32,.4);border-color:var(--muted)}
+  .chip:active{transform:scale(.95)}
+  .chip .dot{transition:transform .25s,background-color .2s}
+  .chip[aria-pressed="true"] .dot{transform:scale(1.5)}
+
+  /* campos */
+  input,select,textarea{transition:border-color .2s,box-shadow .2s}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+
+  /* cards entram em cascata e reagem ao mouse */
+  .card,.pcard,.rate{animation:fade-up .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*70ms);transition:transform .25s cubic-bezier(.2,.8,.2,1),box-shadow .25s,border-color .2s}
+  .card:hover,.pcard:hover,.rate:hover{transform:translateY(-4px);box-shadow:0 14px 28px -16px rgba(35,31,32,.35);border-color:var(--accent)}
+  .card.best{animation:fade-up .55s cubic-bezier(.2,.8,.2,1) both,pulse-ring 1.8s ease-out .6s 2;animation-delay:calc(var(--i,0)*70ms),calc(var(--i,0)*70ms + .6s)}
+  .card.best:hover{border-color:var(--good)}
+  .pcard h3 a{background:linear-gradient(var(--accent),var(--accent)) 0 100%/0 2px no-repeat;transition:background-size .3s,color .2s}
+  .pcard h3 a:hover{background-size:100% 2px}
+  .tag{animation:pop .4s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*70ms + .2s)}
+  .alert{animation:slide-in .45s cubic-bezier(.2,.8,.2,1) both}
+  .alerts .alert:nth-child(2){animation-delay:.08s}.alerts .alert:nth-child(3){animation-delay:.16s}.alerts .alert:nth-child(n+4){animation-delay:.24s}
+  .why{animation:fade-up .5s ease .35s both}
+  .big{transition:color .3s}
+  .card:hover .big{color:var(--accent)}
+
+  /* tabelas */
+  tbody tr{transition:background-color .15s}
+  tbody tr:hover td{background:var(--accent-soft)}
+  tr.best-row:hover td{background:var(--good-soft);filter:brightness(.97)}
+  .tbl-wrap,.legend{animation:fade-in .6s ease .15s both}
+
+  /* editor */
+  details.edit>summary{transition:background-color .2s,color .2s}
+  details.edit>summary:hover{background:var(--accent-soft);color:var(--accent);border-radius:10px}
+  details.edit[open] .edit-body{animation:drop .35s cubic-bezier(.2,.8,.2,1) both}
+  .sc-edit{animation:fade-up .4s cubic-bezier(.2,.8,.2,1) both;transition:border-color .2s,box-shadow .2s}
+  .sc-edit:hover{border-color:var(--muted);box-shadow:0 6px 16px -12px rgba(35,31,32,.4)}
+
+  /* status de gravação */
+  .status{animation:fade-in .25s ease both}
+  .status:not(:empty)::before{content:"";display:inline-block;width:.6em;height:.6em;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:0}
+  .status.err::before{animation:pulse-ring 1s infinite}
+  .empty{animation:fade-up .5s ease both}
+}

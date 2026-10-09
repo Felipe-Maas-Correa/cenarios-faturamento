@@ -109,11 +109,11 @@ export function ProjectList() {
           <p className="hint">Nenhum projeto encontrado com esse filtro.</p>
         )}
         {projects &&
-          ids.map((id) => {
+          ids.map((id, idx) => {
             const P = projects[id];
             const { best } = analyse(P);
             return (
-              <article className="pcard" key={id}>
+              <article className="pcard" key={id} style={{ "--i": Math.min(idx, 8) } as React.CSSProperties}>
                 <div className="tags">
                   <span className={`tag ${STATUS_TAG[P.status] || ""}`}>{P.status}</span>
                   {P.cenarios.some((s) => s.credito) && <span className="tag warn">Crédito em análise</span>}

@@ -56,7 +56,7 @@ export function Results({ P }: { P: Projeto }) {
             const second = sorted[1];
             const ded = P.ded.icms || P.ded.pis || P.ded.fin;
             return (
-              <article className={`card${isBest ? " best" : ""}`} key={i}>
+              <article className={`card${isBest ? " best" : ""}`} key={i} style={{ "--i": Math.min(i, 8) } as React.CSSProperties}>
                 <div>
                   <div className="eyebrow">Cenário {i + 1}</div>
                   <h3>{x.sc.nome}</h3>
