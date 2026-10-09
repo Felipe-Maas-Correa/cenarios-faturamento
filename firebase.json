@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "cenarios-faturamento",
     "public": "out",
     "cleanUrls": true,
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
