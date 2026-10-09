@@ -1,6 +1,7 @@
 import { analyse } from "@/lib/calc";
 import { PCT, parseNum, prazoTxt, R } from "@/lib/format";
 import { CountUp } from "./CountUp";
+import { Icon } from "./ui";
 import type { Projeto } from "@/lib/types";
 
 export function Alerts({ P }: { P: Projeto }) {
@@ -11,20 +12,23 @@ export function Alerts({ P }: { P: Projeto }) {
     <div className="alerts">
       {dir.length > 0 && (
         <div className="alert">
-          <b>DIFAL{P.ufCliente ? ` — cliente no ${P.ufCliente}` : ""}:</b> nos cenários de faturamento
-          direto ({dir.join("; ")}) é preciso confirmar se o diferencial de alíquota fica por nossa conta.
+          <Icon name="warn" size={18} className="ai" />
+          <span><b>DIFAL{P.ufCliente ? ` — cliente no ${P.ufCliente}` : ""}:</b> nos cenários de faturamento
+          direto ({dir.join("; ")}) é preciso confirmar se o diferencial de alíquota fica por nossa conta.</span>
         </div>
       )}
       {cred.length > 0 && (
         <div className="alert">
-          <b>Crédito em análise:</b> {cred.join("; ")} dependem da aprovação de crédito do fornecedor.
+          <Icon name="warn" size={18} className="ai" />
+          <span><b>Crédito em análise:</b> {cred.join("; ")} dependem da aprovação de crédito do fornecedor.</span>
         </div>
       )}
       {P.obs
         .filter((o) => o.trim())
         .map((o, i) => (
           <div className="alert info" key={i}>
-            {o}
+            <Icon name="info" size={18} className="ai" />
+            <span>{o}</span>
           </div>
         ))}
     </div>
@@ -63,7 +67,7 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
                     <div className="eyebrow">Cenário {i + 1}</div>
                     <h3>{x.sc.nome}</h3>
                   </div>
-                  <button className="btn ghost sm" onClick={() => onEditar("cenarios")} aria-label={`Editar ${x.sc.nome}`}>Editar</button>
+                  <button className="btn ghost sm" onClick={() => onEditar("cenarios")} aria-label={`Editar ${x.sc.nome}`}><Icon name="edit" size={13} /> Editar</button>
                 </div>
                 <div className="tags">
                   {isBest && <span className="tag good">Menor custo</span>}

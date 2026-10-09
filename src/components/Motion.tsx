@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { Icon } from "./ui";
 
 const STEP = 90; // ms entre elementos vizinhos
 
@@ -119,7 +120,7 @@ export function Motion() {
       tabIndex={fab ? 0 : -1}
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
     >
-      ↑
+      <Icon name="up" size={18} />
     </button>
   );
 }
