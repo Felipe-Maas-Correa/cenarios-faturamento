@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { fmtMoney, fmtNum, parseNum } from "@/lib/format";
 import type { SaveState } from "@/lib/projects";
 import { STATUS, type Cenario, type Projeto, type Status } from "@/lib/types";
-import { Icon, SegControl, Select, type Opt } from "./ui";
+import { Icon, SegControl, Select, STATUS_OPTS } from "./ui";
 
 type Update = (mutate: (p: Projeto) => Projeto) => void;
 export type Aba = "projeto" | "impostos" | "cenarios" | "obs";
@@ -16,12 +16,6 @@ const ABAS: { id: Aba; nome: string }[] = [
   { id: "obs", nome: "Observações" },
 ];
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
-const STATUS_OPTS: Opt[] = [
-  { value: "Em análise", label: "Em análise", dot: "#e29a00" },
-  { value: "Aprovado", label: "Aprovado", dot: "#1e7a4c" },
-  { value: "Reprovado", label: "Reprovado", dot: "#c8141b" },
-  { value: "Rascunho", label: "Rascunho", dot: "#8a8688" },
-];
 const PRAZOS = ["", "30", "30/60", "30/60/90", "30/60/90/120", "28/56/84"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

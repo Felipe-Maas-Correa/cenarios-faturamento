@@ -394,3 +394,32 @@ input[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 3px var(--ac
   .sel-pop.up{animation-name:pop-up;transform-origin:bottom}
   .sel-opt{transition:background-color .12s}
 }
+
+/* ---------- status com cor e ícone próprios ---------- */
+[data-tone="warn"]{--t:#8a5a00;--tb:#fdf0d2;--tc:#e29a00}
+[data-tone="good"]{--t:#17653e;--tb:#dcf1e5;--tc:#1e7a4c}
+[data-tone="bad"]{--t:#a3121a;--tb:#fde3e3;--tc:#c8141b}
+[data-tone="muted"]{--t:#4d494b;--tb:#ececed;--tc:#8a8688}
+.sel .sel-i,.sel-opt .sel-i{color:var(--tc,var(--muted))}
+.sel.pill{height:44px;gap:9px;padding:0 16px 0 14px;background:var(--tb,var(--surface));color:var(--t,var(--fg));border-color:transparent;box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--tc,var(--line)) 35%,transparent);transition:background-color .35s,color .35s,box-shadow .25s,transform .15s}
+.sel.pill .caret{color:var(--t,var(--ink))}
+.sel.pill:hover{box-shadow:inset 0 0 0 1.5px var(--tc,var(--muted)),0 8px 16px -10px var(--tc,var(--muted))}
+.sel.pill[aria-expanded="true"]{border-color:transparent;box-shadow:inset 0 0 0 2px var(--tc,var(--accent)),0 0 0 4px color-mix(in srgb,var(--tc,var(--accent)) 20%,transparent)}
+.sel.pill[aria-expanded="true"] .caret{color:var(--t)}
+.sel-opt[data-tone].active{background:var(--tb)}
+.sel-opt[data-tone][aria-selected="true"]{color:var(--t)}
+.sel-opt[data-tone] .ok{color:var(--tc)}
+
+/* ---------- controle segmentado com indicador deslizante ---------- */
+.seg{position:relative}
+.seg-thumb{position:absolute;top:4px;bottom:4px;left:4px;width:calc((100% - 8px - (var(--n) - 1) * 4px) / var(--n));border-radius:7px;background:var(--brand);box-shadow:0 4px 10px -4px rgba(237,28,36,.65);transform:translateX(calc(var(--i) * (100% + 4px)));pointer-events:none}
+.seg button{position:relative;z-index:1}
+.seg button.on{background:none!important;box-shadow:none!important;color:#fff}
+@media (prefers-reduced-motion:no-preference){
+  .seg-thumb{transition:transform .5s cubic-bezier(.5,1.55,.4,1)}
+  .seg button{transition:color .3s}
+  .sel .sel-i{animation:pop .45s var(--ease-out) both}
+  .rcard.on .rcard-i{animation:pop .45s var(--ease-out) both}
+  .rcard{transition:border-color .25s,background-color .25s,box-shadow .25s,transform .2s var(--ease-out)}
+  .rcard:active{transform:scale(.98)}
+}

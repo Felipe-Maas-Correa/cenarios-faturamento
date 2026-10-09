@@ -8,7 +8,7 @@ import { CountUp } from "./CountUp";
 import { criarProjeto, novoProjeto, useProjects } from "@/lib/projects";
 import { STATUS, type Status } from "@/lib/types";
 import { ErrorNote } from "./ErrorNote";
-import { Select, type Opt } from "./ui";
+import { STATUS_OPTS, Select, type Opt } from "./ui";
 
 export const STATUS_TAG: Record<Status, string> = {
   "Em análise": "warn",
@@ -17,7 +17,7 @@ export const STATUS_TAG: Record<Status, string> = {
   Rascunho: "",
 };
 
-const FILTRO: Opt[] = [{ value: "", label: "Todos os status" }, ...STATUS.map((s) => ({ value: s, label: s }))];
+const FILTRO: Opt[] = [{ value: "", label: "Todos os status" }, ...STATUS_OPTS];
 
 export function ProjectList() {
   const router = useRouter();

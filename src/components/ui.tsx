@@ -16,6 +16,8 @@ const PATHS = {
   warn: "M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z",
   info: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",
   down: "M5.5 9h13a1 1 0 0 1 .8 1.6l-6.5 8.7a1 1 0 0 1-1.6 0l-6.5-8.7A1 1 0 0 1 5.5 9z",
+  clock: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm4.2 14.2L11 13V7h1.5v5.2l4.5 2.7-.8 1.3z",
+  draft: "M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6zm-1 7V3.5L18.5 9H13z",
   bolt: "M7 2v11h3v9l7-12h-4l4-8z",
 } as const;
 
@@ -29,7 +31,7 @@ export function Icon({ name, size = 18, className = "" }: { name: IconName; size
   );
 }
 
-/** Controle segmentado: a opção ativa fica preenchida em vermelho. */
+/** Controle segmentado: um indicador vermelho desliza até a opção escolhida. */
 export function SegControl<T extends string>({
   value,
   options,
@@ -41,8 +43,10 @@ export function SegControl<T extends string>({
   onChange: (v: T) => void;
   label: string;
 }) {
+  const idx = Math.max(0, options.findIndex((o) => o.v === value));
   return (
-    <div className="seg" role="radiogroup" aria-label={label}>
+    <div className="seg" role="radiogroup" aria-label={label} style={{ "--n": options.length, "--i": idx } as React.CSSProperties}>
+      <span className="seg-thumb" aria-hidden />
       {options.map((o) => (
         <button key={o.v} type="button" role="radio" aria-checked={value === o.v} className={value === o.v ? "on" : ""} onClick={() => onChange(o.v)}>
           {o.t}
@@ -56,7 +60,16 @@ export interface Opt {
   value: string;
   label: string;
   dot?: string; // cor do marcador (opcional)
+  icon?: IconName; // ícone preenchido (opcional)
+  tone?: "warn" | "good" | "bad" | "muted"; // cor semântica
 }
+
+export const STATUS_OPTS: Opt[] = [
+  { value: "Em análise", label: "Em análise", icon: "clock", tone: "warn" },
+  { value: "Aprovado", label: "Aprovado", icon: "check", tone: "good" },
+  { value: "Reprovado", label: "Reprovado", icon: "close", tone: "bad" },
+  { value: "Rascunho", label: "Rascunho", icon: "draft", tone: "muted" },
+];
 
 /**
  * Seletor próprio (no lugar do <select> do navegador, que não aceita estilo).
@@ -159,6 +172,7 @@ export function Select({
         ref={btn}
         type="button"
         className={`sel ${variant}`}
+        data-tone={sel?.tone}
         role="combobox"
         aria-label={label}
         aria-haspopup="listbox"
@@ -167,6 +181,7 @@ export function Select({
         onClick={() => (open ? fechar() : abrir())}
         onKeyDown={onKey}
       >
+        {sel?.icon && <Icon key={sel.value} name={sel.icon} size={variant === "pill" ? 18 : 17} className="sel-i" />}
         {sel?.dot && <span className="sdot" style={{ background: sel.dot }} />}
         <span className="sel-v">{sel?.label ?? ""}</span>
         <Icon name="down" size={13} className="caret" />
@@ -189,10 +204,12 @@ export function Select({
                 aria-selected={o.value === value}
                 data-active={i === active}
                 className={`sel-opt${i === active ? " active" : ""}`}
+                data-tone={o.tone}
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => escolher(o.value)}
               >
+                {o.icon && <Icon name={o.icon} size={18} className="sel-i" />}
                 {o.dot && <span className="sdot" style={{ background: o.dot }} />}
                 <span className="sel-v">{o.label}</span>
                 {o.value === value && <Icon name="check" size={18} className="ok" />}

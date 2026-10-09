@@ -6,16 +6,9 @@ import { PCT } from "@/lib/format";
 import { criarProjeto, useProject } from "@/lib/projects";
 import { type Status } from "@/lib/types";
 import { Editor, type Aba } from "./Editor";
-import { Icon, SegControl, Select, type Opt } from "./ui";
+import { Icon, SegControl, Select, STATUS_OPTS } from "./ui";
 import { ErrorNote } from "./ErrorNote";
 import { Alerts, Results } from "./Results";
-
-const STATUS_OPTS: Opt[] = [
-  { value: "Em análise", label: "Em análise", dot: "#e29a00" },
-  { value: "Aprovado", label: "Aprovado", dot: "#1e7a4c" },
-  { value: "Reprovado", label: "Reprovado", dot: "#c8141b" },
-  { value: "Rascunho", label: "Rascunho", dot: "#8a8688" },
-];
 
 export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEditor?: boolean }) {
   const router = useRouter();
