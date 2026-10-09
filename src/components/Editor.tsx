@@ -222,12 +222,17 @@ export function Editor({
   const ufInvalida = P.ufCliente.length === 2 && !UFS.includes(P.ufCliente);
   const panelRef = useRef<HTMLElement>(null);
 
+  // onClose muda a cada render do pai: guarda em ref para não refazer o efeito (que roubava o foco a cada tecla)
+  const closeRef = useRef(onClose);
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && onClose();
+    closeRef.current = onClose;
+  });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && closeRef.current();
     window.addEventListener("keydown", onKey);
-    panelRef.current?.focus();
+    panelRef.current?.focus(); // só ao abrir
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
 
 
   if (typeof document === "undefined") return null;

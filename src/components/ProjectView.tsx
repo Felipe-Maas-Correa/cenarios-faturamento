@@ -15,6 +15,23 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
   const { projeto: P, missing, error, diag, saveState, update, remove } = useProject(id);
   const [painel, setPainel] = useState<"fechado" | "aberto" | "fechando">(abrirEditor ? "aberto" : "fechado");
   const [aba, setAba] = useState<Aba>(abrirEditor ? "projeto" : "cenarios");
+  const [gerando, setGerando] = useState<null | "pdf" | "xlsx">(null);
+  const [erroExport, setErroExport] = useState(false);
+  async function exportar(tipo: "pdf" | "xlsx") {
+    if (!P || gerando) return;
+    setGerando(tipo);
+    setErroExport(false);
+    try {
+      const m = await import("@/lib/export");
+      if (tipo === "pdf") await m.exportarPdf(P);
+      else await m.exportarExcel(P);
+    } catch (e) {
+      console.error(e);
+      setErroExport(true);
+    } finally {
+      setGerando(null);
+    }
+  }
   const fechar = () => {
     setPainel("fechando"); // roda a animação de saída antes de desmontar
     setTimeout(() => setPainel("fechado"), 280);
@@ -99,6 +116,12 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
           </div>
           <div className="proj-actions">
             <Select variant="pill" label="Status do projeto" value={P.status} options={STATUS_OPTS} onChange={(v) => update((p) => ({ ...p, status: v as Status }))} />
+            <button className="btn ghost" onClick={() => exportar("pdf")} disabled={!!gerando} aria-label="Exportar em PDF">
+              {gerando === "pdf" ? <span className="spin" /> : <Icon name="draft" size={16} />} {gerando === "pdf" ? "Gerando…" : "PDF"}
+            </button>
+            <button className="btn ghost" onClick={() => exportar("xlsx")} disabled={!!gerando} aria-label="Exportar em Excel">
+              {gerando === "xlsx" ? <span className="spin" /> : <Icon name="sheet" size={16} />} {gerando === "xlsx" ? "Gerando…" : "Excel"}
+            </button>
             <button className="btn" onClick={() => editar("projeto")}><Icon name="edit" size={16} /> Editar projeto</button>
           </div>
         </div>
@@ -128,6 +151,7 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
             />
           </div>
         </div>
+        {erroExport && <div className="alert err" role="alert">Não foi possível gerar o arquivo. Tente novamente.</div>}
         <Alerts P={P} />
       </header>
 

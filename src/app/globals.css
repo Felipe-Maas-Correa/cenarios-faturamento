@@ -433,3 +433,7 @@ main.section{container-type:inline-size}
   .proj-head{grid-template-columns:minmax(0,1fr)}
 }
 .status{user-select:none}
+
+/* indicador de carregamento dos botões */
+.spin{display:inline-block;width:14px;height:14px;border-radius:50%;border:2.5px solid currentColor;border-right-color:transparent;vertical-align:-2px;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}

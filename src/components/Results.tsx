@@ -1,5 +1,6 @@
 import { analyse } from "@/lib/calc";
 import { PCT, parseNum, prazoTxt, R } from "@/lib/format";
+import { motivosMelhor } from "@/lib/report";
 import { CountUp } from "./CountUp";
 import { Icon } from "./ui";
 import type { Projeto } from "@/lib/types";
@@ -138,38 +139,12 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
                   <div className="why">
                     <b>Por que é a melhor opção</b>
                     <ul>
-                      {second && (
-                        <li>
-                          Valor {R(second.liq - x.liq)} menor que o 2º colocado ({second.sc.nome}).
+                      {motivosMelhor(P).map((m, k) => (
+                        <li key={k}>
+                          {m.ressalva && <b>Ressalva: </b>}
+                          {m.texto}
                         </li>
-                      )}
-                      <li>
-                        {x.pMat.length
-                          ? `Materiais com prazo de ${x.pMat.join("/")} dias, preservando o caixa.`
-                          : "Materiais à vista, sem custo financeiro embutido."}
-                      </li>
-                      {hasC && (
-                        <li>{x.pCompl.length ? `${cn} parcelado em ${x.pCompl.join("/")} dias.` : `${cn} à vista.`}</li>
-                      )}
-                      {x.sc.modal === "filial" && (
-                        <li>Faturamento via Alpha Filial, sem risco de DIFAL no faturamento direto.</li>
-                      )}
-                      {x.sc.credito && (
-                        <li>
-                          <b>Ressalva:</b> depende da aprovação de crédito.
-                        </li>
-                      )}
-                      {x.sc.modal === "direto" && (
-                        <li>
-                          <b>Ressalva:</b> confirmar DIFAL{P.ufCliente ? ` do ${P.ufCliente}` : ""}, que pode elevar o
-                          custo final.
-                        </li>
-                      )}
-                      {bestClean && bestClean !== x && (
-                        <li>
-                          Melhor opção sem pendências: {bestClean.sc.nome} ({R(bestClean.liq)}).
-                        </li>
-                      )}
+                      ))}
                     </ul>
                   </div>
                 )}
