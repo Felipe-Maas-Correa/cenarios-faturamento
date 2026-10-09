@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { fmtMoney, fmtNum, parseNum } from "@/lib/format";
 import type { SaveState } from "@/lib/projects";
 import { STATUS, type Cenario, type Projeto, type Status } from "@/lib/types";
-import { Icon, SegControl } from "./ui";
+import { Icon, SegControl, Select, type Opt } from "./ui";
 
 type Update = (mutate: (p: Projeto) => Projeto) => void;
 export type Aba = "projeto" | "impostos" | "cenarios" | "obs";
@@ -16,6 +16,12 @@ const ABAS: { id: Aba; nome: string }[] = [
   { id: "obs", nome: "Observações" },
 ];
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
+const STATUS_OPTS: Opt[] = [
+  { value: "Em análise", label: "Em análise", dot: "#e29a00" },
+  { value: "Aprovado", label: "Aprovado", dot: "#1e7a4c" },
+  { value: "Reprovado", label: "Reprovado", dot: "#c8141b" },
+  { value: "Rascunho", label: "Rascunho", dot: "#8a8688" },
+];
 const PRAZOS = ["", "30", "30/60", "30/60/90", "30/60/90/120", "28/56/84"];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -219,10 +225,11 @@ export function Editor({
     update((p) => ({ ...p, cenarios: p.cenarios.map((s, j) => (j === i ? { ...s, ...patch } : s)) }));
   const setCompl = (patch: Partial<Projeto["compl"]>) => update((p) => ({ ...p, compl: { ...p.compl, ...patch } }));
   const hasC = P.compl.valor > 0;
+  const ufInvalida = P.ufCliente.length === 2 && !UFS.includes(P.ufCliente);
   const panelRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !e.defaultPrevented && onClose();
     window.addEventListener("keydown", onKey);
     panelRef.current?.focus();
     return () => window.removeEventListener("keydown", onKey);
@@ -267,22 +274,22 @@ export function Editor({
                 </Field>
                 <div className="two">
                   <Field label="UF do cliente">
-                    <select value={P.ufCliente} onChange={(e) => set("ufCliente", e.target.value)}>
-                      <option value="">Selecione</option>
-                      {UFS.map((u) => (
-                        <option key={u}>{u}</option>
-                      ))}
-                    </select>
+                    <input
+                      value={P.ufCliente}
+                      onChange={(e) => set("ufCliente", e.target.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2))}
+                      maxLength={2}
+                      placeholder="Ex.: MT"
+                      autoComplete="off"
+                      aria-invalid={ufInvalida}
+                      className="uf-input"
+                    />
                   </Field>
-                  <Field label="Status">
-                    <select value={P.status} onChange={(e) => set("status", e.target.value as Status)}>
-                      {STATUS.map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
-                  </Field>
+                  <div className="field">
+                    <span>Status</span>
+                    <Select label="Status" value={P.status} options={STATUS_OPTS} onChange={(v) => set("status", v as Status)} />
+                  </div>
                 </div>
-                <p className="hint">A UF do cliente alimenta o alerta de DIFAL nos cenários de faturamento direto.</p>
+                <p className={`hint${ufInvalida ? " err" : ""}`}>{ufInvalida ? "UF inválida. Use a sigla de um estado, como MT, RS ou SP." : "A UF do cliente alimenta o alerta de DIFAL nos cenários de faturamento direto."}</p>
               </Section>
               <Section title="Outras ações">
                 <div className="btn-row">

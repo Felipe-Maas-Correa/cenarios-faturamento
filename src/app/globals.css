@@ -367,3 +367,30 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;cursor:pointer
   .drawer-body>*:nth-child(n+5){animation-delay:.28s}
   .drawer-head,.tabs{animation:fade-in .5s ease .1s both}
 }
+
+/* ---------- seletor próprio (substitui o select do navegador) ---------- */
+.sel{display:flex;align-items:center;gap:10px;width:100%;height:42px;padding:0 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);font:inherit;cursor:pointer;text-align:left;transition:border-color .2s,box-shadow .2s,background-color .2s}
+.sel:hover{border-color:var(--muted)}
+.sel[aria-expanded="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.sel .sel-v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sel .caret{color:var(--ink);transition:transform .25s var(--ease-out)}
+.sel[aria-expanded="true"] .caret{transform:rotate(180deg);color:var(--accent)}
+.sel .sdot,.sel-opt .sdot{width:10px;height:10px;border-radius:50%;flex:none}
+.sel.pill{width:auto;border-radius:999px;padding:0 16px;font-weight:700}
+.filter-sel{flex:0 0 220px}
+.sel-pop{position:fixed;z-index:3000;margin:0;padding:6px;list-style:none;max-height:280px;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 22px 44px -16px rgba(35,31,32,.5)}
+.sel-opt{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 10px;border-radius:8px;cursor:pointer;font-size:.92rem;color:var(--fg)}
+.sel-opt .sel-v{flex:1}
+.sel-opt.active{background:var(--accent-soft)}
+.sel-opt[aria-selected="true"]{font-weight:700;color:var(--accent)}
+.sel-opt .ok{color:var(--brand)}
+.uf-input{text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono)}
+input[aria-invalid="true"]{border-color:var(--bad);box-shadow:0 0 0 3px var(--accent-soft)}
+.hint.err{color:var(--bad);font-weight:600}
+@media (prefers-reduced-motion:no-preference){
+  @keyframes pop-down{from{opacity:0;transform:translateY(-8px) scale(.97)}to{opacity:1;transform:none}}
+  @keyframes pop-up{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+  .sel-pop{animation:pop-down .22s var(--ease-out) both;transform-origin:top}
+  .sel-pop.up{animation-name:pop-up;transform-origin:bottom}
+  .sel-opt{transition:background-color .12s}
+}

@@ -8,6 +8,7 @@ import { CountUp } from "./CountUp";
 import { criarProjeto, novoProjeto, useProjects } from "@/lib/projects";
 import { STATUS, type Status } from "@/lib/types";
 import { ErrorNote } from "./ErrorNote";
+import { Select, type Opt } from "./ui";
 
 export const STATUS_TAG: Record<Status, string> = {
   "Em análise": "warn",
@@ -15,6 +16,8 @@ export const STATUS_TAG: Record<Status, string> = {
   Reprovado: "bad",
   Rascunho: "",
 };
+
+const FILTRO: Opt[] = [{ value: "", label: "Todos os status" }, ...STATUS.map((s) => ({ value: s, label: s }))];
 
 export function ProjectList() {
   const router = useRouter();
@@ -86,12 +89,7 @@ export function ProjectList() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
-        <select aria-label="Filtrar por status" value={fs} onChange={(e) => setFs(e.target.value)}>
-          <option value="">Todos os status</option>
-          {STATUS.map((s) => (
-            <option key={s}>{s}</option>
-          ))}
-        </select>
+        <div className="filter-sel"><Select label="Filtrar por status" value={fs} options={FILTRO} onChange={setFs} /></div>
       </div>
 
       <div className="plist">

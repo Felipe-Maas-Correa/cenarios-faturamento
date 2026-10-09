@@ -4,11 +4,18 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PCT } from "@/lib/format";
 import { criarProjeto, useProject } from "@/lib/projects";
-import { STATUS, type Status } from "@/lib/types";
+import { type Status } from "@/lib/types";
 import { Editor, type Aba } from "./Editor";
-import { Icon, SegControl } from "./ui";
+import { Icon, SegControl, Select, type Opt } from "./ui";
 import { ErrorNote } from "./ErrorNote";
 import { Alerts, Results } from "./Results";
+
+const STATUS_OPTS: Opt[] = [
+  { value: "Em análise", label: "Em análise", dot: "#e29a00" },
+  { value: "Aprovado", label: "Aprovado", dot: "#1e7a4c" },
+  { value: "Reprovado", label: "Reprovado", dot: "#c8141b" },
+  { value: "Rascunho", label: "Rascunho", dot: "#8a8688" },
+];
 
 export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEditor?: boolean }) {
   const router = useRouter();
@@ -97,12 +104,7 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
             <div className="muted" style={{ fontSize: ".88rem" }}>{sub}</div>
           </div>
           <div className="proj-actions">
-            <label className="status-pick" data-status={P.status}>
-              <span className="sdot" />
-              <select aria-label="Status do projeto" value={P.status} onChange={(e) => update((p) => ({ ...p, status: e.target.value as Status }))}>
-                {STATUS.map((s) => <option key={s}>{s}</option>)}
-              </select>
-            </label>
+            <Select variant="pill" label="Status do projeto" value={P.status} options={STATUS_OPTS} onChange={(v) => update((p) => ({ ...p, status: v as Status }))} />
             <button className="btn" onClick={() => editar("projeto")}><Icon name="edit" size={16} /> Editar projeto</button>
           </div>
         </div>

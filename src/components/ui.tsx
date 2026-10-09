@@ -1,3 +1,7 @@
+"use client";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+
 /** Ícones preenchidos (sólidos) e controles compartilhados. */
 const PATHS = {
   edit: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
@@ -11,6 +15,7 @@ const PATHS = {
   up: "M5.5 15h13a1 1 0 0 0 .8-1.6l-6.5-8.7a1 1 0 0 0-1.6 0l-6.5 8.7A1 1 0 0 0 5.5 15z",
   warn: "M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z",
   info: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",
+  down: "M5.5 9h13a1 1 0 0 1 .8 1.6l-6.5 8.7a1 1 0 0 1-1.6 0l-6.5-8.7A1 1 0 0 1 5.5 9z",
   bolt: "M7 2v11h3v9l7-12h-4l4-8z",
 } as const;
 
@@ -44,5 +49,158 @@ export function SegControl<T extends string>({
         </button>
       ))}
     </div>
+  );
+}
+
+export interface Opt {
+  value: string;
+  label: string;
+  dot?: string; // cor do marcador (opcional)
+}
+
+/**
+ * Seletor próprio (no lugar do <select> do navegador, que não aceita estilo).
+ * Teclado: ↑ ↓ Home End Enter Espaço Esc. A lista abre num portal, sem ser cortada por painéis.
+ */
+export function Select({
+  value,
+  options,
+  onChange,
+  label,
+  variant = "field",
+}: {
+  value: string;
+  options: Opt[];
+  onChange: (v: string) => void;
+  label: string;
+  variant?: "field" | "pill";
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const [box, setBox] = useState<{ left: number; top: number; width: number; up: boolean } | null>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  const pop = useRef<HTMLUListElement>(null);
+  const id = useId();
+  const sel = options.find((o) => o.value === value);
+
+  const abrir = useCallback(() => {
+    const r = btn.current?.getBoundingClientRect();
+    if (!r) return;
+    const h = Math.min(280, options.length * 40 + 12);
+    const up = window.innerHeight - r.bottom < h + 12 && r.top > h + 12;
+    setBox({ left: r.left, top: up ? r.top - 6 : r.bottom + 6, width: Math.max(r.width, 180), up });
+    setActive(Math.max(0, options.findIndex((o) => o.value === value)));
+    setOpen(true);
+  }, [options, value]);
+  const fechar = useCallback(() => setOpen(false), []);
+  const escolher = (v: string) => {
+    onChange(v);
+    setOpen(false);
+    btn.current?.focus();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    const fora = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!btn.current?.contains(t) && !pop.current?.contains(t)) setOpen(false);
+    };
+    const sai = (e: Event) => {
+      if (pop.current && e.target instanceof Node && pop.current.contains(e.target)) return; // rolagem da própria lista
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", fora);
+    window.addEventListener("resize", sai);
+    window.addEventListener("scroll", sai, true);
+    return () => {
+      document.removeEventListener("mousedown", fora);
+      window.removeEventListener("resize", sai);
+      window.removeEventListener("scroll", sai, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (open) pop.current?.querySelector<HTMLElement>('[data-active="true"]')?.scrollIntoView({ block: "nearest" });
+  }, [open, active]);
+
+  const onKey = (e: React.KeyboardEvent) => {
+    const k = e.key;
+    if (!open) {
+      if (["ArrowDown", "ArrowUp", "Enter", " "].includes(k)) {
+        e.preventDefault();
+        abrir();
+      }
+      return;
+    }
+    if (k === "Escape" || k === "Tab") {
+      if (k === "Escape") e.preventDefault(); // não fecha o painel de edição junto
+      fechar();
+    } else if (k === "ArrowDown") {
+      e.preventDefault();
+      setActive((a) => Math.min(options.length - 1, a + 1));
+    } else if (k === "ArrowUp") {
+      e.preventDefault();
+      setActive((a) => Math.max(0, a - 1));
+    } else if (k === "Home") {
+      e.preventDefault();
+      setActive(0);
+    } else if (k === "End") {
+      e.preventDefault();
+      setActive(options.length - 1);
+    } else if (k === "Enter" || k === " ") {
+      e.preventDefault();
+      escolher(options[active].value);
+    }
+  };
+
+  return (
+    <>
+      <button
+        ref={btn}
+        type="button"
+        className={`sel ${variant}`}
+        role="combobox"
+        aria-label={label}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={id}
+        onClick={() => (open ? fechar() : abrir())}
+        onKeyDown={onKey}
+      >
+        {sel?.dot && <span className="sdot" style={{ background: sel.dot }} />}
+        <span className="sel-v">{sel?.label ?? ""}</span>
+        <Icon name="down" size={13} className="caret" />
+      </button>
+      {open &&
+        box &&
+        createPortal(
+          <ul
+            ref={pop}
+            id={id}
+            role="listbox"
+            aria-label={label}
+            className={`sel-pop${box.up ? " up" : ""}`}
+            style={{ left: box.left, minWidth: box.width, ...(box.up ? { bottom: window.innerHeight - box.top } : { top: box.top }) }}
+          >
+            {options.map((o, i) => (
+              <li
+                key={o.value || "_"}
+                role="option"
+                aria-selected={o.value === value}
+                data-active={i === active}
+                className={`sel-opt${i === active ? " active" : ""}`}
+                onMouseEnter={() => setActive(i)}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => escolher(o.value)}
+              >
+                {o.dot && <span className="sdot" style={{ background: o.dot }} />}
+                <span className="sel-v">{o.label}</span>
+                {o.value === value && <Icon name="check" size={18} className="ok" />}
+              </li>
+            ))}
+          </ul>,
+          document.body,
+        )}
+    </>
   );
 }
