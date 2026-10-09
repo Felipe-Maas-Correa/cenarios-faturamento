@@ -45,13 +45,7 @@ export interface Aviso {
 export function avisos(P: Projeto): Aviso[] {
   const { res } = analyse(P);
   const out: Aviso[] = [];
-  const dir = res.filter((x) => x.sc.modal === "direto").map((x) => x.sc.nome);
   const cred = res.filter((x) => x.sc.credito).map((x) => x.sc.nome);
-  if (dir.length)
-    out.push({
-      tipo: "warn",
-      texto: `DIFAL${P.ufCliente ? ` - cliente no ${P.ufCliente}` : ""}: nos cenários de faturamento direto (${dir.join("; ")}) é preciso confirmar se o diferencial de alíquota fica por nossa conta.`,
-    });
   if (cred.length)
     out.push({ tipo: "warn", texto: `Crédito em análise: ${cred.join("; ")} dependem da aprovação de crédito do fornecedor.` });
   P.obs.filter((o) => o.trim()).forEach((o) => out.push({ tipo: "info", texto: o.trim() }));

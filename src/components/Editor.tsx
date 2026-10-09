@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { fmtMoney, fmtNum, parseNum } from "@/lib/format";
 import type { SaveState } from "@/lib/projects";
@@ -40,6 +40,29 @@ function Section({ title, desc, children }: { title: string; desc?: string; chil
   );
 }
 
+/**
+ * Máscara pt-BR ao digitar: agrupa milhares com ponto (10000 vira 10.000) e aceita decimais depois da vírgula.
+ */
+function mascara(raw: string, maxDec: number): string {
+  const s = raw.replace(/[^\d,]/g, "");
+  const i = s.indexOf(",");
+  const inteiro = (i < 0 ? s : s.slice(0, i)).replace(/^0+(?=\d)/, "");
+  const agrupado = inteiro.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  if (i < 0) return agrupado;
+  return (agrupado || "0") + "," + s.slice(i + 1).replace(/,/g, "").slice(0, maxDec);
+}
+
+/** posição do cursor depois da máscara: mantém a mesma quantidade de dígitos/vírgula à esquerda */
+function posCursor(texto: string, significativos: number): number {
+  if (significativos <= 0) return 0;
+  let n = 0;
+  for (let k = 0; k < texto.length; k++) {
+    if (/[\d,]/.test(texto[k])) n++;
+    if (n === significativos) return k + 1;
+  }
+  return texto.length;
+}
+
 /** Entrada numérica em formato pt-BR: edita como texto e confirma ao sair do campo ou com Enter. */
 function NumInput({
   value,
@@ -57,9 +80,17 @@ function NumInput({
   const fmt = money ? fmtMoney : fmtNum;
   const [text, setText] = useState(fmt(value));
   const focused = useRef(false);
+  const ref = useRef<HTMLInputElement>(null);
+  const cursor = useRef<number | null>(null);
   useEffect(() => {
     if (!focused.current) setText(fmt(value));
   }, [value, fmt]);
+  useLayoutEffect(() => {
+    if (cursor.current !== null && ref.current) {
+      ref.current.setSelectionRange(cursor.current, cursor.current);
+      cursor.current = null;
+    }
+  }, [text]);
   const commit = () => {
     const n = parseNum(text);
     setText(fmt(n));
@@ -69,6 +100,7 @@ function NumInput({
     <span className="affix">
       {money && <i>R$</i>}
       <input
+        ref={ref}
         aria-label={label}
         inputMode="decimal"
         value={text}
@@ -76,7 +108,15 @@ function NumInput({
           focused.current = true;
           e.target.select();
         }}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const pos = e.target.selectionStart ?? raw.length;
+          const next = mascara(raw, money ? 2 : 4);
+          cursor.current = posCursor(next, raw.slice(0, pos).replace(/[^\d,]/g, "").length);
+          setText(next);
+          const n = parseNum(next);
+          if (n !== value) onCommit(n); // atualiza os cálculos enquanto digita
+        }}
         onBlur={() => {
           focused.current = false;
           commit();
@@ -287,7 +327,7 @@ export function Editor({
                     <Select label="Status" value={P.status} options={STATUS_OPTS} onChange={(v) => set("status", v as Status)} />
                   </div>
                 </div>
-                <p className={`hint${ufInvalida ? " err" : ""}`}>{ufInvalida ? "UF inválida. Use a sigla de um estado, como MT, RS ou SP." : "A UF do cliente alimenta o alerta de DIFAL nos cenários de faturamento direto."}</p>
+                <p className={`hint${ufInvalida ? " err" : ""}`}>{ufInvalida ? "UF inválida. Use a sigla de um estado, como MT, RS ou SP." : "A UF do cliente aparece nos textos sobre DIFAL dos cenários de faturamento direto."}</p>
               </Section>
               <Section title="Outras ações">
                 <div className="btn-row">

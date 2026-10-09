@@ -8,16 +8,8 @@ import type { Projeto } from "@/lib/types";
 export function Alerts({ P }: { P: Projeto }) {
   const { res } = analyse(P);
   const cred = res.filter((x) => x.sc.credito).map((x) => x.sc.nome);
-  const dir = res.filter((x) => x.sc.modal === "direto").map((x) => x.sc.nome);
   return (
     <div className="alerts">
-      {dir.length > 0 && (
-        <div className="alert">
-          <Icon name="warn" size={18} className="ai" />
-          <span><b>DIFAL{P.ufCliente ? ` — cliente no ${P.ufCliente}` : ""}:</b> nos cenários de faturamento
-          direto ({dir.join("; ")}) é preciso confirmar se o diferencial de alíquota fica por nossa conta.</span>
-        </div>
-      )}
       {cred.length > 0 && (
         <div className="alert">
           <Icon name="warn" size={18} className="ai" />
