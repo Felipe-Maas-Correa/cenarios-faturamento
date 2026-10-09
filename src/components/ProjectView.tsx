@@ -33,7 +33,17 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
   if (!P)
     return (
       <main className="section">
-        <p className="hint">Carregando projeto…</p>
+        <div className="skel l2" style={{ width: "40%", height: 36 }} />
+        <div className="skel l4" />
+        <div className="cards" aria-hidden>
+          {[0, 1, 2].map((i) => (
+            <div className="card" key={i}>
+              <div className="skel l1" />
+              <div className="skel l2" />
+              <div className="skel l4" />
+            </div>
+          ))}
+        </div>
         {diag && (
           <div className="alert err" role="alert">
             <b>Não foi possível carregar.</b> {diag}
@@ -72,12 +82,12 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
     <main className={`section${editando ? " com-painel" : ""}`} style={{ gap: 28 }}>
       <header>
         <div className="btn-row">
-          <Link className="btn ghost sm" href="/">← Todos os projetos</Link>
+          <Link className="btn ghost sm" href="/"><span className="arrow">←</span> Todos os projetos</Link>
           <span className={`status${saveState === "error" ? " err" : ""}`} role="status">{saveTxt}</span>
         </div>
         <div className="title-row between">
           <div style={{ minWidth: 0 }}>
-            <h1>{P.nome}</h1>
+            <h1 data-anim="line"><span>{P.nome}</span></h1>
             <div className="muted" style={{ fontSize: ".88rem" }}>{sub}</div>
           </div>
           <div className="btn-row">

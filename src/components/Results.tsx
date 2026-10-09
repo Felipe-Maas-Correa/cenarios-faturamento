@@ -1,5 +1,6 @@
 import { analyse } from "@/lib/calc";
 import { PCT, parseNum, prazoTxt, R } from "@/lib/format";
+import { CountUp } from "./CountUp";
 import type { Projeto } from "@/lib/types";
 
 export function Alerts({ P }: { P: Projeto }) {
@@ -46,7 +47,7 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
   return (
     <>
       <section className="section">
-        <h2>Cenários</h2>
+        <h2 data-anim="rise">Cenários</h2>
         <div className="cards">
           {res.length === 0 && (
             <p className="hint">Nenhum cenário cadastrado. Abra a edição abaixo e clique em Adicionar cenário.</p>
@@ -56,7 +57,7 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
             const second = sorted[1];
             const ded = P.ded.icms || P.ded.pis || P.ded.fin;
             return (
-              <article className={`card${isBest ? " best" : ""}`} key={i} style={{ "--i": Math.min(i, 8) } as React.CSSProperties}>
+              <article className={`card${isBest ? " best" : ""}`} key={i} data-anim="panel">
                 <div className="card-h">
                   <div>
                     <div className="eyebrow">Cenário {i + 1}</div>
@@ -115,7 +116,7 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
                   )}
                   <div className="row total">
                     <span>{ded ? "Valor líquido" : "Valor total"}</span>
-                    <span className="big">{R(x.liq)}</span>
+                    <CountUp className="big" value={x.liq} />
                   </div>
                 </div>
                 <div className="cond">
@@ -175,8 +176,8 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
       </section>
 
       <section className="section">
-        <h2>Comparativo</h2>
-        <div className="tbl-wrap">
+        <h2 data-anim="rise">Comparativo</h2>
+        <div className="tbl-wrap" data-anim="wipe">
           <table>
             <thead>
               <tr>
@@ -217,12 +218,12 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
       </section>
 
       <section className="section">
-        <h2>Cronograma de pagamentos</h2>
+        <h2 data-anim="rise">Cronograma de pagamentos</h2>
         <div className="legend">
           <span>Materiais (fabricante)</span>
           {hasC && <span className="c">{cn}</span>}
         </div>
-        <div className="tbl-wrap">
+        <div className="tbl-wrap" data-anim="wipe">
           <table>
             <thead>
               <tr>
@@ -269,7 +270,7 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
       </section>
 
       <section className="section">
-        <h2>Alíquotas e taxas</h2>
+        <h2 data-anim="rise">Alíquotas e taxas</h2>
         <div className="rates">
           <Rate t="ICMS" v={PCT(P.icms)} d={P.ded.icms ? "Retirado dos valores" : "Incluso nos valores"} on={P.ded.icms} />
           <Rate
@@ -293,7 +294,7 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
 
 function Rate({ t, v, d, on }: { t: string; v: string; d: string; on: boolean }) {
   return (
-    <div className={`rate${on ? " on" : ""}`}>
+    <div className={`rate${on ? " on" : ""}`} data-anim="panel">
       <div className="eyebrow">{t}</div>
       <div className="v">{v}</div>
       <div className="muted">{d}</div>

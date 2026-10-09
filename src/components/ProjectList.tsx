@@ -3,7 +3,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { analyse } from "@/lib/calc";
-import { fmtDate, R } from "@/lib/format";
+import { fmtDate } from "@/lib/format";
+import { CountUp } from "./CountUp";
 import { criarProjeto, novoProjeto, useProjects } from "@/lib/projects";
 import { STATUS, type Status } from "@/lib/types";
 import { ErrorNote } from "./ErrorNote";
@@ -66,7 +67,7 @@ export function ProjectList() {
   return (
     <main className="section" style={{ gap: 20 }}>
       <div className="title-row between">
-        <h1>Cenários de Faturamento</h1>
+        <h1 data-anim="line"><span>Cenários de Faturamento</span></h1>
         <button className="btn" onClick={novo} disabled={busy || !!error}>
           Novo projeto
         </button>
@@ -94,7 +95,15 @@ export function ProjectList() {
       </div>
 
       <div className="plist">
-        {!projects && !error && <p className="hint">Carregando projetos…</p>}
+        {!projects && !error &&
+          [0, 1, 2].map((i) => (
+            <div className="pcard" key={i} aria-hidden>
+              <div className="skel l1" />
+              <div className="skel l2" />
+              <div className="skel l3" />
+              <div className="skel l4" />
+            </div>
+          ))}
         {projects && total === 0 && (
           <div className="empty" style={{ gridColumn: "1/-1" }}>
             <h2>Nenhum projeto ainda</h2>
@@ -108,11 +117,11 @@ export function ProjectList() {
           <p className="hint">Nenhum projeto encontrado com esse filtro.</p>
         )}
         {projects &&
-          ids.map((id, idx) => {
+          ids.map((id) => {
             const P = projects[id];
             const { best } = analyse(P);
             return (
-              <article className="pcard" key={id} style={{ "--i": Math.min(idx, 8) } as React.CSSProperties}>
+              <article className="pcard" key={id} data-anim="panel">
                 <div className="tags">
                   <span className={`tag ${STATUS_TAG[P.status] || ""}`}>{P.status}</span>
                   {P.cenarios.some((s) => s.credito) && <span className="tag warn">Crédito em análise</span>}
@@ -131,7 +140,7 @@ export function ProjectList() {
                   </div>
                   <div>
                     <div className="eyebrow">Menor valor</div>
-                    <div className="v">{best ? R(best.liq) : "—"}</div>
+                    <div className="v">{best ? <CountUp value={best.liq} /> : "—"}</div>
                   </div>
                 </div>
                 {best && (

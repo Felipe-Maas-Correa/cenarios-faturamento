@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { IBM_Plex_Mono, IBM_Plex_Sans, Montserrat } from "next/font/google";
 import { Analytics } from "@/components/Analytics";
+import { Motion } from "@/components/Motion";
 import "./globals.css";
 
 const display = Montserrat({ subsets: ["latin"], weight: ["500", "700", "800"], variable: "--f-display" });
@@ -15,7 +16,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+    <html lang="pt-BR" className={`${display.variable} ${body.variable} ${mono.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
+      </head>
       <body>
         <Analytics />
         <div className="site-head">
@@ -34,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             sobre as parcelas a prazo.
           </footer>
         </div>
+        <Motion />
       </body>
     </html>
   );
