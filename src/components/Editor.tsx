@@ -199,6 +199,7 @@ export function Editor({
   aba,
   setAba,
   onClose,
+  fechando,
   onDuplicate,
   onDelete,
   saveState,
@@ -208,6 +209,7 @@ export function Editor({
   aba: Aba;
   setAba: (a: Aba) => void;
   onClose: () => void;
+  fechando: boolean;
   onDuplicate: () => void;
   onDelete: () => void;
   saveState: SaveState;
@@ -232,8 +234,8 @@ export function Editor({
   // portal: o painel precisa ficar acima do cabeçalho, fora do contexto de empilhamento da página
   return createPortal(
     <>
-      <div className="drawer-backdrop" onClick={onClose} aria-hidden />
-      <aside className="drawer" role="dialog" aria-label="Editar projeto" tabIndex={-1} ref={panelRef}>
+      <div className={`drawer-backdrop${fechando ? " is-closing" : ""}`} onClick={onClose} aria-hidden />
+      <aside className={`drawer${fechando ? " is-closing" : ""}`} role="dialog" aria-label="Editar projeto" tabIndex={-1} ref={panelRef}>
         <div className="drawer-head">
           <div>
             <div className="eyebrow">Editando</div>

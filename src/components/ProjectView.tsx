@@ -13,11 +13,15 @@ import { Alerts, Results } from "./Results";
 export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEditor?: boolean }) {
   const router = useRouter();
   const { projeto: P, missing, error, diag, saveState, update, remove } = useProject(id);
-  const [editando, setEditando] = useState(abrirEditor);
+  const [painel, setPainel] = useState<"fechado" | "aberto" | "fechando">(abrirEditor ? "aberto" : "fechado");
   const [aba, setAba] = useState<Aba>(abrirEditor ? "projeto" : "cenarios");
+  const fechar = () => {
+    setPainel("fechando"); // roda a animação de saída antes de desmontar
+    setTimeout(() => setPainel("fechado"), 280);
+  };
   const editar = (a: Aba) => {
     setAba(a);
-    setEditando(true);
+    setPainel("aberto");
   };
 
   if (error) return <main className="section"><ErrorNote error={error} /><Link className="btn ghost sm" href="/"><Icon name="left" size={12} /> Todos os projetos</Link></main>;
@@ -80,7 +84,7 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
   const saveTxt = { idle: "", saving: "Salvando…", saved: "Salvo", error: "Não foi possível salvar. Tente de novo em instantes." }[saveState];
 
   return (
-    <main className={`section${editando ? " com-painel" : ""}`} style={{ gap: 28 }}>
+    <main className={`section${painel === "aberto" ? " com-painel" : ""}`} style={{ gap: 28 }}>
       <header>
         <div className="btn-row">
           <Link className="btn ghost sm" href="/"><Icon name="left" size={12} className="arrow" /> Todos os projetos</Link>
@@ -132,8 +136,8 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
       </header>
 
       <Results P={P} onEditar={editar} />
-      {editando && (
-        <Editor P={P} update={update} aba={aba} setAba={setAba} saveState={saveState} onClose={() => setEditando(false)} onDuplicate={duplicar} onDelete={excluir} />
+      {painel !== "fechado" && (
+        <Editor P={P} update={update} aba={aba} setAba={setAba} saveState={saveState} fechando={painel === "fechando"} onClose={fechar} onDuplicate={duplicar} onDelete={excluir} />
       )}
     </main>
   );

@@ -1,6 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Icon } from "./ui";
+import { useEffect } from "react";
 
 const STEP = 90; // ms entre elementos vizinhos
 
@@ -29,11 +28,8 @@ function cascade(els: HTMLElement[]) {
  * Efeitos globais, sem dependências:
  *  - revelação por rolagem de tudo que tem [data-anim] (inclusive elementos criados depois);
  *  - cabeçalho com sombra ao rolar, que some ao descer e volta ao subir;
- *  - botão "voltar ao topo".
  */
 export function Motion() {
-  const [fab, setFab] = useState(false);
-
   useEffect(() => {
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const head = document.querySelector<HTMLElement>(".site-head");
@@ -49,7 +45,6 @@ export function Motion() {
           if (y < lastY - 4) head.classList.remove("is-hidden");
         }
       }
-      setFab(y > window.innerHeight * 0.6);
       lastY = y;
       ticking = false;
     };
@@ -112,15 +107,5 @@ export function Motion() {
     };
   }, []);
 
-  return (
-    <button
-      type="button"
-      className={`fab${fab ? " is-visible" : ""}`}
-      aria-label="Voltar ao topo"
-      tabIndex={fab ? 0 : -1}
-      onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-    >
-      <Icon name="up" size={18} />
-    </button>
-  );
+  return null;
 }

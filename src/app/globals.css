@@ -97,8 +97,6 @@ footer{font-size:.78rem;color:var(--muted);border-top:1px solid var(--line);padd
 /* ---------- movimento (inspirado em alphaeletrica.ind.br: entrada por rolagem, corrente elétrica, lâmpada acendendo) ---------- */
 :root{--ease-out:cubic-bezier(.16,1,.3,1);--ease-in-out:cubic-bezier(.65,0,.35,1);--ease-power:cubic-bezier(.7,0,.2,1)}
 .site-head{position:sticky;top:0;z-index:30}
-.fab{position:fixed;right:20px;bottom:20px;z-index:45;width:46px;height:46px;border-radius:50%;border:0;background:var(--brand);color:#fff;font-size:1.2rem;cursor:pointer;display:grid;place-items:center;box-shadow:0 8px 20px -6px rgba(200,20,27,.6);opacity:0;transform:translateY(16px) scale(.9);pointer-events:none}
-.fab.is-visible{opacity:1;transform:none;pointer-events:auto}
 .skel{border-radius:10px;background:var(--surface-2);min-height:14px}
 .skel.l1{height:14px;width:30%}.skel.l2{height:22px;width:70%}.skel.l3{height:14px;width:50%}.skel.l4{height:44px}
 
@@ -126,10 +124,6 @@ footer{font-size:.78rem;color:var(--muted);border-top:1px solid var(--line);padd
   .site-head.is-hidden{transform:translateY(-110%)}
   .site-head img{transition:transform .3s var(--ease-out),filter .3s}
   .site-head a:hover img{transform:scale(1.04) rotate(-.6deg);filter:drop-shadow(0 4px 8px rgba(237,28,36,.25))}
-  .fab{transition:opacity .35s var(--ease-out),transform .35s var(--ease-out),box-shadow .2s}
-  .fab.is-visible{animation:pulse-red 2.2s ease-out 1}
-  .fab:hover{transform:translateY(-3px)}
-  .fab:active{transform:scale(.93)}
   .wrap>main{animation:fade-in .35s ease both}
 
   /* esqueleto de carregamento */
@@ -352,3 +346,24 @@ select{appearance:none;-webkit-appearance:none;padding-right:34px;cursor:pointer
 .rcard>*,.sec>*,.field>*{min-width:0}
 .affix{width:100%}
 .affix input{width:100%}
+
+/* painel de edição: sempre acima do cabeçalho (portal no body) e com animação de entrada e saída */
+.drawer-backdrop{z-index:1000}
+.drawer{z-index:1010}
+@media (prefers-reduced-motion:no-preference){
+  @keyframes drawer-in{from{transform:translateX(100%)}to{transform:none}}
+  @keyframes drawer-out{from{transform:none}to{transform:translateX(100%)}}
+  @keyframes backdrop-out{from{opacity:1}to{opacity:0}}
+  @keyframes item-in{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+  .drawer{animation:drawer-in .38s var(--ease-out) both}
+  .drawer.is-closing{animation:drawer-out .28s var(--ease-in-out) both;pointer-events:none}
+  .drawer-backdrop{animation:fade-in .3s ease both}
+  .drawer-backdrop.is-closing{animation:backdrop-out .28s ease both}
+  .drawer-body{animation:none}
+  .drawer-body>*{animation:item-in .45s var(--ease-out) both}
+  .drawer-body>*:nth-child(2){animation-delay:.07s}
+  .drawer-body>*:nth-child(3){animation-delay:.14s}
+  .drawer-body>*:nth-child(4){animation-delay:.21s}
+  .drawer-body>*:nth-child(n+5){animation-delay:.28s}
+  .drawer-head,.tabs{animation:fade-in .5s ease .1s both}
+}
