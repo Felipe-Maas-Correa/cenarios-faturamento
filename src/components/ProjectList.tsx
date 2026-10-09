@@ -37,7 +37,7 @@ export function ProjectList() {
     setBusy(true);
     try {
       const id = await criarProjeto(novoProjeto());
-      router.push(`/projeto/${id}`);
+      router.push(`/projeto?id=${id}`);
     } catch {
       setBusy(false);
     }
@@ -55,7 +55,7 @@ export function ProjectList() {
         criadoEm: agora,
         atualizadoEm: agora,
       });
-      router.push(`/projeto/${nid}`);
+      router.push(`/projeto?id=${nid}`);
     } catch {
       setBusy(false);
     }
@@ -119,7 +119,7 @@ export function ProjectList() {
                   {P.cenarios.some((s) => s.credito) && <span className="tag warn">Crédito em análise</span>}
                 </div>
                 <h3>
-                  <Link href={`/projeto/${id}`}>{P.nome}</Link>
+                  <Link href={`/projeto?id=${id}`}>{P.nome}</Link>
                 </h3>
                 <div className="muted" style={{ fontSize: ".84rem" }}>
                   {P.cliente || "Cliente não informado"}
@@ -141,7 +141,7 @@ export function ProjectList() {
                   </div>
                 )}
                 <div className="btn-row">
-                  <Link className="btn sm" href={`/projeto/${id}`}>
+                  <Link className="btn sm" href={`/projeto?id=${id}`}>
                     Abrir
                   </Link>
                   <button className="btn ghost sm" onClick={() => duplicar(id)} disabled={busy}>

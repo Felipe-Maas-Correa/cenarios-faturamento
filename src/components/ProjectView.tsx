@@ -42,7 +42,7 @@ export function ProjectView({ id }: { id: string }) {
     if (!P) return;
     const agora = new Date().toISOString();
     const nid = await criarProjeto({ ...P, nome: P.nome + " (cópia)", status: "Rascunho", criadoEm: agora, atualizadoEm: agora });
-    router.push(`/projeto/${nid}`);
+    router.push(`/projeto?id=${nid}`);
   }
   async function excluir() {
     await remove();
