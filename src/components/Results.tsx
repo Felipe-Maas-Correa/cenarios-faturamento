@@ -30,7 +30,7 @@ export function Alerts({ P }: { P: Projeto }) {
   );
 }
 
-export function Results({ P }: { P: Projeto }) {
+export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios") => void }) {
   const { res, sorted, best, bestClean } = analyse(P);
   const cn = P.compl.fornecedor || "Item complementar";
   const hasC = parseNum(P.compl.valor) > 0;
@@ -52,14 +52,17 @@ export function Results({ P }: { P: Projeto }) {
             <p className="hint">Nenhum cenário cadastrado. Abra a edição abaixo e clique em Adicionar cenário.</p>
           )}
           {res.map((x, i) => {
-            const isBest = x === best && res.length > 1;
+            const isBest = x === best && res.length > 1 && x.liq > 0;
             const second = sorted[1];
             const ded = P.ded.icms || P.ded.pis || P.ded.fin;
             return (
               <article className={`card${isBest ? " best" : ""}`} key={i} style={{ "--i": Math.min(i, 8) } as React.CSSProperties}>
-                <div>
-                  <div className="eyebrow">Cenário {i + 1}</div>
-                  <h3>{x.sc.nome}</h3>
+                <div className="card-h">
+                  <div>
+                    <div className="eyebrow">Cenário {i + 1}</div>
+                    <h3>{x.sc.nome}</h3>
+                  </div>
+                  <button className="btn ghost sm" onClick={() => onEditar("cenarios")} aria-label={`Editar ${x.sc.nome}`}>Editar</button>
                 </div>
                 <div className="tags">
                   {isBest && <span className="tag good">Menor custo</span>}
@@ -191,7 +194,7 @@ export function Results({ P }: { P: Projeto }) {
             </thead>
             <tbody>
               {res.map((x, i) => (
-                <tr key={i} className={x === best && res.length > 1 ? "best-row" : ""}>
+                <tr key={i} className={x === best && res.length > 1 && x.liq > 0 ? "best-row" : ""}>
                   <td>
                     {i + 1}. {x.sc.nome}
                   </td>

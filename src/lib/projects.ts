@@ -8,7 +8,7 @@ import {
   type FirestoreError,
 } from "firebase/firestore";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { db } from "./firebase";
+import { db, diagnosticarFirestore } from "./firebase";
 import type { Projeto } from "./types";
 
 const COLECAO = "projetos";
@@ -44,22 +44,39 @@ export function normalize(p: Partial<Projeto> | undefined): Projeto {
 }
 
 export const novoId = () => doc(collection(db, COLECAO)).id;
-export const criarProjeto = async (p: Projeto, id = novoId()) => {
-  await setDoc(doc(db, COLECAO, id), p);
+/** Cria sem esperar a confirmação do servidor: a escrita local já aparece na hora (e sincroniza depois). */
+export const criarProjeto = (p: Projeto, id = novoId()) => {
+  setDoc(doc(db, COLECAO, id), p).catch(() => {});
   return id;
 };
+
+/** Se nada chegar em 4 s, pergunta à API do Firestore o motivo (banco inexistente, regras, rede). */
+export function useDiagnostico(carregando: boolean) {
+  const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => {
+    if (!carregando) {
+      setMsg(null);
+      return;
+    }
+    let vivo = true;
+    const t = setTimeout(async () => {
+      const d = await diagnosticarFirestore();
+      if (vivo && d !== "ok") setMsg(d);
+    }, 4000);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [carregando]);
+  return msg;
+}
 export const excluirProjeto = (id: string) => deleteDoc(doc(db, COLECAO, id));
 
 /** Lista de projetos em tempo real. `projects` é null enquanto carrega. */
 export function useProjects() {
   const [projects, setProjects] = useState<Record<string, Projeto> | null>(null);
   const [error, setError] = useState<FirestoreError | null>(null);
-  const [slow, setSlow] = useState(false);
-  useEffect(() => {
-    if (projects) return;
-    const t = setTimeout(() => setSlow(true), 8000);
-    return () => clearTimeout(t);
-  }, [projects]);
+  const diag = useDiagnostico(!projects);
   useEffect(
     () =>
       onSnapshot(
@@ -74,7 +91,7 @@ export function useProjects() {
       ),
     [],
   );
-  return { projects, error, slow };
+  return { projects, error, diag };
 }
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
@@ -91,13 +108,20 @@ export function useProject(id: string) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const deleted = useRef(false);
 
-  useEffect(
-    () =>
-      onSnapshot(
+  const diag = useDiagnostico(!draft && !missing);
+
+  useEffect(() => {
+    // trocou de projeto: descarta o estado do anterior
+    ref.current = null;
+    dirty.current = false;
+    deleted.current = false;
+    setDraft(null);
+    setMissing(false);
+    return onSnapshot(
         doc(db, COLECAO, id),
         (snap) => {
           if (!snap.exists()) {
-            setMissing(true);
+            if (!snap.metadata.fromCache) setMissing(true);
             return;
           }
           setMissing(false);
@@ -107,9 +131,8 @@ export function useProject(id: string) {
           setDraft(p);
         },
         setError,
-      ),
-    [id],
-  );
+      );
+  }, [id]);
 
   const flush = useCallback(async () => {
     clearTimeout(timer.current);
@@ -143,11 +166,11 @@ export function useProject(id: string) {
   // grava o que estiver pendente ao sair da tela
   useEffect(() => () => void flush(), [flush]);
 
-  const remove = useCallback(async () => {
+  const remove = useCallback(() => {
     deleted.current = true;
     clearTimeout(timer.current);
-    await excluirProjeto(id);
+    excluirProjeto(id).catch(() => {});
   }, [id]);
 
-  return { projeto: draft, missing, error, saveState, update, remove };
+  return { projeto: draft, missing, error, diag, saveState, update, remove };
 }

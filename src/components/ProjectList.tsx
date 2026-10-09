@@ -17,7 +17,7 @@ export const STATUS_TAG: Record<Status, string> = {
 
 export function ProjectList() {
   const router = useRouter();
-  const { projects, error, slow } = useProjects();
+  const { projects, error, diag } = useProjects();
   const [q, setQ] = useState("");
   const [fs, setFs] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,22 +33,22 @@ export function ProjectList() {
       .sort((a, b) => projects[b].atualizadoEm.localeCompare(projects[a].atualizadoEm));
   }, [projects, q, fs]);
 
-  async function novo() {
+  function novo() {
     setBusy(true);
     try {
-      const id = await criarProjeto(novoProjeto());
-      router.push(`/projeto?id=${id}`);
+      const id = criarProjeto(novoProjeto());
+      router.push(`/projeto?id=${id}&editar=1`);
     } catch {
       setBusy(false);
     }
   }
 
-  async function duplicar(id: string) {
+  function duplicar(id: string) {
     if (!projects) return;
     setBusy(true);
     try {
       const agora = new Date().toISOString();
-      const nid = await criarProjeto({
+      const nid = criarProjeto({
         ...projects[id],
         nome: projects[id].nome + " (cópia)",
         status: "Rascunho",
@@ -72,10 +72,9 @@ export function ProjectList() {
         </button>
       </div>
       {error && <ErrorNote error={error} />}
-      {slow && !projects && !error && (
+      {diag && !projects && !error && (
         <div className="alert err" role="alert">
-          <b>Sem resposta do Firestore.</b> Verifique a conexão e se o banco Firestore foi criado no console do
-          Firebase (projeto {process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}).
+          <b>Não foi possível carregar os projetos.</b> {diag}
         </div>
       )}
       <div className="filters">

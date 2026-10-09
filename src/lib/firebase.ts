@@ -1,5 +1,11 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import {
+  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  type Firestore,
+} from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -12,7 +18,43 @@ const firebaseConfig = {
 };
 
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+function criarDb(): Firestore {
+  if (typeof window === "undefined") return getFirestore(app);
+  try {
+    // Cache local (IndexedDB): ao recarregar, os dados aparecem na hora, sem esperar a rede.
+    // Long polling: evita a espera de dezenas de segundos em redes com proxy/firewall que
+    // bloqueiam o canal padrão (WebChannel).
+    return initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+      experimentalForceLongPolling: true,
+    });
+  } catch {
+    return getFirestore(app); // já inicializado (hot reload)
+  }
+}
+export const db = criarDb();
+
+/** Pergunta direto à API do Firestore o que está errado (banco inexistente, regras, API desativada). */
+export async function diagnosticarFirestore(): Promise<string> {
+  const { projectId, apiKey } = firebaseConfig;
+  try {
+    const r = await fetch(
+      `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/projetos?pageSize=1&key=${apiKey}`,
+    );
+    if (r.ok) return "ok";
+    if (r.status === 404) return "O banco Firestore ainda não foi criado neste projeto. Crie em Build → Firestore Database → Criar banco de dados, no console do Firebase.";
+    if (r.status === 403) {
+      const msg: string = (await r.json().catch(() => ({})))?.error?.message ?? "";
+      return /has not been used|disabled/i.test(msg)
+        ? "A API do Cloud Firestore está desativada neste projeto. Crie o banco em Build → Firestore Database no console do Firebase."
+        : "O Firestore recusou o acesso. Ajuste as regras de segurança para liberar a coleção “projetos”.";
+    }
+    return `O Firestore respondeu com erro ${r.status}.`;
+  } catch {
+    return "Não foi possível alcançar o Firestore. Verifique a conexão com a internet ou bloqueios de rede (proxy/firewall).";
+  }
+}
 
 /** Analytics só existe no navegador; carregado sob demanda. */
 export async function initAnalytics() {

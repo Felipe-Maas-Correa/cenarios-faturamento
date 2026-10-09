@@ -1,16 +1,23 @@
 "use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { PCT } from "@/lib/format";
 import { criarProjeto, useProject } from "@/lib/projects";
 import { STATUS, type Status } from "@/lib/types";
-import { Editor } from "./Editor";
+import { Editor, type Aba } from "./Editor";
 import { ErrorNote } from "./ErrorNote";
 import { Alerts, Results } from "./Results";
 
-export function ProjectView({ id }: { id: string }) {
+export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEditor?: boolean }) {
   const router = useRouter();
-  const { projeto: P, missing, error, saveState, update, remove } = useProject(id);
+  const { projeto: P, missing, error, diag, saveState, update, remove } = useProject(id);
+  const [editando, setEditando] = useState(abrirEditor);
+  const [aba, setAba] = useState<Aba>(abrirEditor ? "projeto" : "cenarios");
+  const editar = (a: Aba) => {
+    setAba(a);
+    setEditando(true);
+  };
 
   if (error) return <main className="section"><ErrorNote error={error} /><Link className="btn ghost sm" href="/">← Todos os projetos</Link></main>;
   if (missing)
@@ -23,7 +30,17 @@ export function ProjectView({ id }: { id: string }) {
         </div>
       </main>
     );
-  if (!P) return <main className="section"><p className="hint">Carregando projeto…</p></main>;
+  if (!P)
+    return (
+      <main className="section">
+        <p className="hint">Carregando projeto…</p>
+        {diag && (
+          <div className="alert err" role="alert">
+            <b>Não foi possível carregar.</b> {diag}
+          </div>
+        )}
+      </main>
+    );
 
   const hasC = P.compl.valor > 0;
   const cn = P.compl.fornecedor || "Item complementar";
@@ -38,21 +55,21 @@ export function ProjectView({ id }: { id: string }) {
 
   const toggle = (k: "icms" | "pis" | "fin") => update((p) => ({ ...p, ded: { ...p.ded, [k]: !p.ded[k] } }));
 
-  async function duplicar() {
+  function duplicar() {
     if (!P) return;
     const agora = new Date().toISOString();
-    const nid = await criarProjeto({ ...P, nome: P.nome + " (cópia)", status: "Rascunho", criadoEm: agora, atualizadoEm: agora });
+    const nid = criarProjeto({ ...P, nome: P.nome + " (cópia)", status: "Rascunho", criadoEm: agora, atualizadoEm: agora });
     router.push(`/projeto?id=${nid}`);
   }
-  async function excluir() {
-    await remove();
+  function excluir() {
+    remove();
     router.push("/");
   }
 
   const saveTxt = { idle: "", saving: "Salvando…", saved: "Salvo", error: "Não foi possível salvar. Tente de novo em instantes." }[saveState];
 
   return (
-    <main className="section" style={{ gap: 28 }}>
+    <main className={`section${editando ? " com-painel" : ""}`} style={{ gap: 28 }}>
       <header>
         <div className="btn-row">
           <Link className="btn ghost sm" href="/">← Todos os projetos</Link>
@@ -63,12 +80,15 @@ export function ProjectView({ id }: { id: string }) {
             <h1>{P.nome}</h1>
             <div className="muted" style={{ fontSize: ".88rem" }}>{sub}</div>
           </div>
-          <label className="field" style={{ minWidth: 160 }}>
-            Status
-            <select value={P.status} onChange={(e) => update((p) => ({ ...p, status: e.target.value as Status }))}>
-              {STATUS.map((s) => <option key={s}>{s}</option>)}
-            </select>
-          </label>
+          <div className="btn-row">
+            <label className="field" style={{ minWidth: 150 }}>
+              Status
+              <select value={P.status} onChange={(e) => update((p) => ({ ...p, status: e.target.value as Status }))}>
+                {STATUS.map((s) => <option key={s}>{s}</option>)}
+              </select>
+            </label>
+            <button className="btn" style={{ alignSelf: "end" }} onClick={() => editar("projeto")}>✎ Editar projeto</button>
+          </div>
         </div>
         <div className="controls" role="group" aria-label="Retirar dos valores">
           <span className="lbl">Retirar dos valores:</span>
@@ -93,8 +113,10 @@ export function ProjectView({ id }: { id: string }) {
         <Alerts P={P} />
       </header>
 
-      <Results P={P} />
-      <Editor P={P} update={update} onDuplicate={duplicar} onDelete={excluir} />
+      <Results P={P} onEditar={editar} />
+      {editando && (
+        <Editor P={P} update={update} aba={aba} setAba={setAba} saveState={saveState} onClose={() => setEditando(false)} onDuplicate={duplicar} onDelete={excluir} />
+      )}
     </main>
   );
 }

@@ -1,0 +1,7 @@
+{
+  "hosting": {
+    "site": "ferramenta-marlon2",
+    "public": "redirect-antigo",
+    "redirects": [{ "source": "**", "destination": "https://cenarios-faturamento.web.app", "type": 301 }]
+  }
+}
