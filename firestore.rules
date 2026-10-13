@@ -1,0 +1,10 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ATENÇÃO: acesso aberto (sem login) apenas à coleção de projetos.
+    // Trocar por regras com autenticação quando o login for implementado.
+    match /projetos/{projeto} {
+      allow read, write: if true;
+    }
+  }
+}
