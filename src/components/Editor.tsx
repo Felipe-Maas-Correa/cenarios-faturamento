@@ -63,6 +63,26 @@ function posCursor(texto: string, significativos: number): number {
   return texto.length;
 }
 
+/**
+ * Máscara de dinheiro estilo "app de banco": os dígitos entram pelos centavos e empurram para a esquerda
+ * (2 vira 0,02; 25 vira 0,25; 2500 vira 25,00; 2500000 vira 25.000,00).
+ */
+function mascaraCentavos(raw: string): { texto: string; valor: number } {
+  const digitos = raw.replace(/\D/g, "").replace(/^0+/, "").slice(0, 13);
+  const valor = digitos ? parseInt(digitos, 10) / 100 : 0;
+  return { texto: fmtMoney(valor), valor };
+}
+
+/** cursor depois da máscara de centavos: mantém a mesma quantidade de dígitos à direita */
+function posCursorDireita(texto: string, digitosADireita: number): number {
+  let n = 0;
+  for (let k = texto.length - 1; k >= 0; k--) {
+    if (/\d/.test(texto[k])) n++;
+    if (n > digitosADireita) return k + 1;
+  }
+  return 0;
+}
+
 /** Entrada numérica em formato pt-BR: edita como texto e confirma ao sair do campo ou com Enter. */
 function NumInput({
   value,
@@ -111,10 +131,19 @@ function NumInput({
         onChange={(e) => {
           const raw = e.target.value;
           const pos = e.target.selectionStart ?? raw.length;
-          const next = mascara(raw, money ? 2 : 4);
-          cursor.current = posCursor(next, raw.slice(0, pos).replace(/[^\d,]/g, "").length);
+          let next: string;
+          let n: number;
+          if (money) {
+            const m = mascaraCentavos(raw);
+            next = m.texto;
+            n = m.valor;
+            cursor.current = posCursorDireita(next, raw.slice(pos).replace(/\D/g, "").length);
+          } else {
+            next = mascara(raw, 4);
+            n = parseNum(next);
+            cursor.current = posCursor(next, raw.slice(0, pos).replace(/[^\d,]/g, "").length);
+          }
           setText(next);
-          const n = parseNum(next);
           if (n !== value) onCommit(n); // atualiza os cálculos enquanto digita
         }}
         onBlur={() => {
