@@ -5,10 +5,10 @@ import { useMemo, useState } from "react";
 import { analyse } from "@/lib/calc";
 import { fmtDate } from "@/lib/format";
 import { CountUp } from "./CountUp";
-import { criarProjeto, novoProjeto, useProjects } from "@/lib/projects";
+import { criarProjeto, excluirProjeto, novoProjeto, useProjects } from "@/lib/projects";
 import { STATUS, type Status } from "@/lib/types";
 import { ErrorNote } from "./ErrorNote";
-import { STATUS_OPTS, Select, type Opt } from "./ui";
+import { Icon, STATUS_OPTS, Select, type Opt } from "./ui";
 
 export const STATUS_TAG: Record<Status, string> = {
   "Em análise": "warn",
@@ -25,6 +25,7 @@ export function ProjectList() {
   const [q, setQ] = useState("");
   const [fs, setFs] = useState("");
   const [busy, setBusy] = useState(false);
+  const [apagar, setApagar] = useState<string | null>(null); // projeto aguardando confirmação de exclusão
 
   const ids = useMemo(() => {
     if (!projects) return [];
@@ -153,6 +154,27 @@ export function ProjectList() {
                   <button className="btn ghost sm" onClick={() => duplicar(id)} disabled={busy}>
                     Duplicar
                   </button>
+                  {apagar === id ? (
+                    <span className="confirm">
+                      Excluir?
+                      <button
+                        className="btn danger sm"
+                        onClick={() => {
+                          excluirProjeto(id).catch(() => {});
+                          setApagar(null);
+                        }}
+                      >
+                        Sim
+                      </button>
+                      <button className="btn ghost sm" onClick={() => setApagar(null)}>
+                        Não
+                      </button>
+                    </span>
+                  ) : (
+                    <button className="icon-btn del" title="Excluir projeto" aria-label={`Excluir ${P.nome}`} onClick={() => setApagar(id)}>
+                      <Icon name="trash" size={16} />
+                    </button>
+                  )}
                   <span className="muted" style={{ fontSize: ".76rem", marginLeft: "auto" }}>
                     Atualizado {fmtDate(P.atualizadoEm)}
                   </span>
