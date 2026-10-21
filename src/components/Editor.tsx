@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { fmtMoney, fmtNum, parseNum } from "@/lib/format";
+import { fmtMoney, fmtNum, parseNum, prazoTxt } from "@/lib/format";
 import type { SaveState } from "@/lib/projects";
 import { STATUS, type Cenario, type Projeto, type Status } from "@/lib/types";
 import { Icon, SegControl, Select, STATUS_OPTS } from "./ui";
@@ -16,7 +16,16 @@ const ABAS: { id: Aba; nome: string }[] = [
   { id: "obs", nome: "Observações" },
 ];
 const UFS = "AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO".split(" ");
-const PRAZOS = ["", "30", "30/60", "30/60/90", "30/60/90/120", "28/56/84"];
+const PRAZOS: { v: string; t: string; dica?: string }[] = [
+  { v: "", t: "À vista" },
+  { v: "30", t: "30 d" },
+  { v: "30/60", t: "30/60 d" },
+  { v: "30/60/90", t: "30/60/90 d" },
+  { v: "30/60/90/120", t: "30/60/90/120 d" },
+  { v: "28/56/84", t: "28/56/84 d" },
+  { v: "0:15/30:15/56:70", t: "15% + 15% + 70%", dica: "15% à vista, 15% em 30 dias e 70% em 56 dias" },
+  { v: "0:30/30:70", t: "30% + 70%", dica: "30% à vista e 70% em 30 dias" },
+];
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -209,11 +218,15 @@ function PrazoField({ label, value, onChange }: { label: string; value: string; 
       <input value={value} onChange={(e) => onChange(e.target.value)} placeholder="À vista" aria-label={label} />
       <span className="presets">
         {PRAZOS.map((p) => (
-          <button key={p || "vista"} type="button" className={`preset${value.trim() === p ? " on" : ""}`} onClick={() => onChange(p)}>
-            {p ? p + " d" : "À vista"}
+          <button key={p.v || "vista"} type="button" title={p.dica} className={`preset${value.trim() === p.v ? " on" : ""}`} onClick={() => onChange(p.v)}>
+            {p.t}
           </button>
         ))}
       </span>
+      <small className="hint prazo-prev">
+        {value.trim() ? <>Entendido como: <b>{prazoTxt(value)}</b>. </> : null}
+        Dias separados por barra; para entrada e saldo use dias:% (ex.: 0:15/30:15/56:70).
+      </small>
     </div>
   );
 }
@@ -376,6 +389,10 @@ export function Editor({
                   <NumField label="ICMS" suffix="%" value={P.icms} onCommit={(n) => set("icms", n)} />
                   <NumField label="Taxa financeira" suffix="%" value={P.taxaFin} onCommit={(n) => set("taxaFin", n)} />
                 </div>
+                <div className="two">
+                  <NumField label="Custo de capital (ao mês)" suffix="%" value={P.custoCapital ?? 0} onCommit={(n) => set("custoCapital", n)} />
+                </div>
+                <p className="hint">O custo de capital traz as parcelas a valor presente na análise das propostas (quanto o prazo vale). Com 0, usa a taxa financeira.</p>
               </Section>
               <Section title="PIS/COFINS" desc="Escolha o regime da empresa. A alíquota do regime selecionado é a usada nos cálculos.">
                 <div className="two rcards" role="radiogroup" aria-label="Regime de PIS/COFINS">
@@ -451,9 +468,36 @@ export function Editor({
                     />
                   </div>
                   <NumField money label="Valor dos materiais (com impostos)" value={sc.valor} onCommit={(n) => setSc(i, { valor: n })} />
-                  <PrazoField label="Prazo dos materiais (dias)" value={sc.prazoMat} onChange={(v) => setSc(i, { prazoMat: v })} />
+                  <PrazoField label="Condição de pagamento dos materiais" value={sc.prazoMat} onChange={(v) => setSc(i, { prazoMat: v })} />
                   {hasC && (
-                    <PrazoField label={`Prazo ${P.compl.fornecedor || "do item complementar"} (dias)`} value={sc.prazoCompl} onChange={(v) => setSc(i, { prazoCompl: v })} />
+                    <PrazoField label={`Condição de pagamento ${P.compl.fornecedor || "do item complementar"}`} value={sc.prazoCompl} onChange={(v) => setSc(i, { prazoCompl: v })} />
+                  )}
+                  {sc.modal === "direto" && (
+                    <div className={`difal-box${(sc.difal ?? "pendente") === "pendente" ? " pend" : ""}`}>
+                      <div className="field">
+                        <span>DIFAL (diferencial de alíquota)</span>
+                        <SegControl
+                          label="DIFAL"
+                          value={sc.difal ?? "pendente"}
+                          onChange={(v) => setSc(i, { difal: v })}
+                          options={[
+                            { v: "pendente", t: "Não definido" },
+                            { v: "cliente", t: "Do cliente" },
+                            { v: "nos", t: "Por nossa conta" },
+                          ]}
+                        />
+                      </div>
+                      {sc.difal === "nos" && (
+                        <NumField label="Alíquota do DIFAL (sobre o total bruto)" suffix="%" value={sc.difalPct ?? 0} onCommit={(n) => setSc(i, { difalPct: n })} />
+                      )}
+                      <small className={`hint${(sc.difal ?? "pendente") === "pendente" ? " err" : ""}`}>
+                        {(sc.difal ?? "pendente") === "pendente"
+                          ? "Defina quem arca com o DIFAL. Enquanto estiver como não definido, esta proposta não é recomendada e a ferramenta mostra um alerta."
+                          : sc.difal === "cliente"
+                            ? "O DIFAL fica com o cliente e não entra no nosso custo."
+                            : "O valor do DIFAL é somado ao custo desta proposta."}
+                      </small>
+                    </div>
                   )}
                   <Switch checked={sc.credito} onChange={(v) => setSc(i, { credito: v })}>
                     Crédito em análise

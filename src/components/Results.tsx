@@ -1,15 +1,33 @@
 import { analyse } from "@/lib/calc";
 import { PCT, parseNum, prazoTxt, R } from "@/lib/format";
-import { motivosMelhor } from "@/lib/report";
+import { cronograma, difalPendentes, motivosMelhor, rotuloDia } from "@/lib/report";
 import { CountUp } from "./CountUp";
 import { Icon } from "./ui";
 import type { Projeto } from "@/lib/types";
 
-export function Alerts({ P }: { P: Projeto }) {
+type Editar = (a: "cenarios" | "impostos") => void;
+
+export function Alerts({ P, onEditar }: { P: Projeto; onEditar?: Editar }) {
   const { res } = analyse(P);
   const cred = res.filter((x) => x.sc.credito).map((x) => x.sc.nome);
+  const difal = difalPendentes(P);
   return (
     <div className="alerts">
+      {difal.length > 0 && (
+        <div className="alert bad">
+          <Icon name="warn" size={18} className="ai" />
+          <span>
+            <b>DIFAL não definido{P.ufCliente ? ` (cliente em ${P.ufCliente})` : ""}:</b> {difal.join("; ")}. No faturamento
+            direto é preciso informar se o DIFAL fica por conta do cliente ou por nossa conta. Enquanto isso, a proposta não é
+            recomendada.
+          </span>
+          {onEditar && (
+            <button className="btn sm alert-cta" onClick={() => onEditar("cenarios")}>
+              Definir DIFAL
+            </button>
+          )}
+        </div>
+      )}
       {cred.length > 0 && (
         <div className="alert">
           <Icon name="warn" size={18} className="ai" />
@@ -28,18 +46,14 @@ export function Alerts({ P }: { P: Projeto }) {
   );
 }
 
-export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios") => void }) {
-  const { res, sorted, best, bestClean } = analyse(P);
+export function Results({ P, onEditar }: { P: Projeto; onEditar: Editar }) {
+  const A = analyse(P);
+  const { res, best, recomendada } = A;
   const cn = P.compl.fornecedor || "Item complementar";
   const hasC = parseNum(P.compl.valor) > 0;
+  const hasDireto = res.some((x) => x.sc.modal === "direto");
   const off = (b: boolean) => (b ? "" : "off");
-
-  const days = new Set<number>([0]);
-  res.forEach((x) => {
-    x.pMat.forEach((d) => days.add(d));
-    if (hasC) x.pCompl.forEach((d) => days.add(d));
-  });
-  const cols = [...days].sort((a, b) => a - b);
+  const cr = cronograma(P);
 
   return (
     <>
@@ -47,14 +61,14 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
         <h2 data-anim="rise">Cenários</h2>
         <div className="cards">
           {res.length === 0 && (
-            <p className="hint">Nenhum cenário cadastrado. Abra a edição abaixo e clique em Adicionar cenário.</p>
+            <p className="hint">Nenhum cenário cadastrado. Abra a edição e clique em Adicionar cenário.</p>
           )}
           {res.map((x, i) => {
-            const isBest = x === best && res.length > 1 && x.liq > 0;
-            const second = sorted[1];
+            const isRec = A.comparavel && x === recomendada;
+            const isMenor = A.comparavel && x === best && !isRec;
             const ded = P.ded.icms || P.ded.pis || P.ded.fin;
             return (
-              <article className={`card${isBest ? " best" : ""}`} key={i} data-anim="panel">
+              <article className={`card${isRec ? " best" : ""}`} key={i} data-anim="panel">
                 <div className="card-h">
                   <div>
                     <div className="eyebrow">Cenário {i + 1}</div>
@@ -63,10 +77,13 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
                   <button className="btn ghost sm" onClick={() => onEditar("cenarios")} aria-label={`Editar ${x.sc.nome}`}><Icon name="edit" size={13} /> Editar</button>
                 </div>
                 <div className="tags">
-                  {isBest && <span className="tag good">Menor custo</span>}
+                  {isRec && <span className="tag good">Recomendada</span>}
+                  {isMenor && <span className="tag acc">Menor custo</span>}
                   <span className="tag acc">{x.sc.modal === "direto" ? "Direto ao cliente" : "Via Alpha Filial"}</span>
                   {x.sc.credito && <span className="tag warn">Crédito em análise</span>}
-                  {x.sc.modal === "direto" && <span className="tag warn">Verificar DIFAL</span>}
+                  {x.difalStatus === "pendente" && <span className="tag bad">DIFAL não definido</span>}
+                  {x.difalStatus === "cliente" && <span className="tag acc">DIFAL do cliente</span>}
+                  {x.difalStatus === "nos" && <span className="tag warn">DIFAL por nossa conta</span>}
                 </div>
                 <div className="rows">
                   <div className="row sub">
@@ -111,9 +128,23 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
                       <span>— (à vista)</span>
                     </div>
                   )}
+                  {x.difal > 0 && (
+                    <div className="row inc">
+                      <span>DIFAL {PCT(parseNum(x.sc.difalPct))} (nosso)</span>
+                      <span className="num">+{R(x.difal)}</span>
+                    </div>
+                  )}
                   <div className="row total">
-                    <span>{ded ? "Valor líquido" : "Valor total"}</span>
+                    <span>{ded || x.difal > 0 ? "Valor líquido" : "Valor total"}</span>
                     <CountUp className="big" value={x.liq} />
+                  </div>
+                  <div className="row sub">
+                    <span>Prazo médio</span>
+                    <span className="num">{x.prazoMedio < 0.5 ? "à vista" : `${Math.round(x.prazoMedio)} dias`}</span>
+                  </div>
+                  <div className="row eff">
+                    <span>Custo efetivo (valor presente)</span>
+                    <span className="num">{R(x.vp)}</span>
                   </div>
                 </div>
                 <div className="cond">
@@ -127,9 +158,9 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
                     </div>
                   )}
                 </div>
-                {isBest && (
+                {isRec && (
                   <div className="why">
-                    <b>Por que é a melhor opção</b>
+                    <b>Por que é a recomendada</b>
                     <ul>
                       {motivosMelhor(P).map((m, k) => (
                         <li key={k}>
@@ -147,8 +178,8 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
       </section>
 
       <section className="section">
-        <h2 data-anim="rise">Comparativo</h2>
-        <div className="tbl-wrap" data-anim="wipe">
+        <h2 data-anim="rise">Comparativo detalhado</h2>
+        <div className="tbl-wrap" data-anim="rise">
           <table>
             <thead>
               <tr>
@@ -159,14 +190,17 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
                 <th className={off(P.ded.icms)}>ICMS</th>
                 <th className={off(P.ded.pis)}>PIS/COFINS</th>
                 <th className={off(P.ded.fin)}>Taxa fin.</th>
+                {hasDireto && <th>DIFAL</th>}
                 <th>Líquido</th>
+                <th>Prazo médio</th>
+                <th>Custo efetivo</th>
                 <th>Cond. materiais</th>
                 {hasC && <th>Cond. {cn}</th>}
               </tr>
             </thead>
             <tbody>
               {res.map((x, i) => (
-                <tr key={i} className={x === best && res.length > 1 && x.liq > 0 ? "best-row" : ""}>
+                <tr key={i} className={x === recomendada && A.comparavel ? "best-row" : ""}>
                   <td>
                     {i + 1}. {x.sc.nome}
                   </td>
@@ -176,8 +210,17 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
                   <td className={`num ${off(P.ded.icms)}`}>{R(x.icms)}</td>
                   <td className={`num ${off(P.ded.pis)}`}>{R(x.pis)}</td>
                   <td className={`num ${off(P.ded.fin)}`}>{x.fin ? R(x.fin) : "—"}</td>
+                  {hasDireto && (
+                    <td className={`num${x.difalStatus === "pendente" ? " warn-t" : ""}`}>
+                      {x.difalStatus === null ? "—" : x.difalStatus === "pendente" ? "Não definido" : x.difalStatus === "cliente" ? "Do cliente" : R(x.difal)}
+                    </td>
+                  )}
                   <td className="num">
                     <b>{R(x.liq)}</b>
+                  </td>
+                  <td className="num">{x.prazoMedio < 0.5 ? "à vista" : `${Math.round(x.prazoMedio)} d`}</td>
+                  <td className="num">
+                    <b>{R(x.vp)}</b>
                   </td>
                   <td>{prazoTxt(x.sc.prazoMat)}</td>
                   {hasC && <td>{prazoTxt(x.sc.prazoCompl)}</td>}
@@ -194,39 +237,32 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
           <span>Materiais (fabricante)</span>
           {hasC && <span className="c">{cn}</span>}
         </div>
-        <div className="tbl-wrap" data-anim="wipe">
+        <div className="tbl-wrap" data-anim="rise">
           <table>
             <thead>
               <tr>
                 <th>Cenário</th>
-                {cols.map((d) => (
-                  <th key={d}>{d ? "D+" + d : "D0"}</th>
+                {cr.cols.map((d) => (
+                  <th key={d}>{rotuloDia(d)}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {res.map((x, i) => {
-                const cell: Record<number, { v: number; k: "m" | "c" }[]> = {};
-                const add = (d: number, v: number, k: "m" | "c") => (cell[d] ||= []).push({ v, k });
-                if (x.pMat.length) x.pMat.forEach((d) => add(d, x.mat / x.pMat.length, "m"));
-                else add(0, x.mat, "m");
-                if (hasC) {
-                  if (x.pCompl.length) x.pCompl.forEach((d) => add(d, x.C / x.pCompl.length, "c"));
-                  else add(0, x.C, "c");
-                }
+                const mat = cr.linhas[hasC ? i * 2 : i];
+                const cmp = hasC ? cr.linhas[i * 2 + 1] : null;
                 return (
                   <tr key={i}>
                     <td>
                       {i + 1}. {x.sc.nome}
                     </td>
-                    {cols.map((d) => (
+                    {cr.cols.map((d) => (
                       <td className="num" key={d}>
-                        {cell[d] ? (
-                          cell[d].map((c, j) => (
-                            <div key={j} className={`cell-${c.k}`}>
-                              {R(c.v)}
-                            </div>
-                          ))
+                        {mat.parcelas[d] || cmp?.parcelas[d] ? (
+                          <>
+                            {mat.parcelas[d] ? <div className="cell-m">{R(mat.parcelas[d])}</div> : null}
+                            {cmp?.parcelas[d] ? <div className="cell-c">{R(cmp.parcelas[d])}</div> : null}
+                          </>
                         ) : (
                           <span className="muted">—</span>
                         )}
@@ -256,6 +292,7 @@ export function Results({ P, onEditar }: { P: Projeto; onEditar: (a: "cenarios")
             d={(P.ded.fin ? "Retirada" : "Inclusa") + "; só nas parcelas a prazo"}
             on={P.ded.fin}
           />
+          <Rate t="Custo de capital" v={PCT(A.taxa * 100)} d="Ao mês; usado no valor presente" on={false} />
           {hasC && <Rate t={cn} v={R(parseNum(P.compl.valor))} d={P.compl.descricao || "Somado a todos os cenários"} on={false} />}
         </div>
       </section>

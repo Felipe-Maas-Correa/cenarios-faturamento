@@ -8,6 +8,7 @@ import { type Status } from "@/lib/types";
 import { Editor, type Aba } from "./Editor";
 import { Icon, SegControl, Select, STATUS_OPTS } from "./ui";
 import { ErrorNote } from "./ErrorNote";
+import { Analise } from "./Analise";
 import { Alerts, Results } from "./Results";
 
 export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEditor?: boolean }) {
@@ -152,9 +153,10 @@ export function ProjectView({ id, abrirEditor = false }: { id: string; abrirEdit
           </div>
         </div>
         {erroExport && <div className="alert err" role="alert">Não foi possível gerar o arquivo. Tente novamente.</div>}
-        <Alerts P={P} />
+        <Alerts P={P} onEditar={editar} />
       </header>
 
+      <Analise P={P} onEditar={editar} />
       <Results P={P} onEditar={editar} />
       {painel !== "fechado" && (
         <Editor P={P} update={update} aba={aba} setAba={setAba} saveState={saveState} fechando={painel === "fechando"} onClose={fechar} onDuplicate={duplicar} onDelete={excluir} />

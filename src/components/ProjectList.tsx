@@ -117,7 +117,7 @@ export function ProjectList() {
         {projects &&
           ids.map((id) => {
             const P = projects[id];
-            const { best } = analyse(P);
+            const { recomendada: best, comparavel } = analyse(P);
             return (
               <article className="pcard" key={id} data-anim="panel">
                 <div className="tags">
@@ -137,13 +137,13 @@ export function ProjectList() {
                     <div className="v">{P.cenarios.length}</div>
                   </div>
                   <div>
-                    <div className="eyebrow">Menor valor</div>
-                    <div className="v">{best ? <CountUp value={best.liq} /> : "—"}</div>
+                    <div className="eyebrow">Custo efetivo</div>
+                    <div className="v">{best ? <CountUp value={best.vp} /> : "—"}</div>
                   </div>
                 </div>
                 {best && (
                   <div style={{ fontSize: ".82rem" }}>
-                    <span className="muted">Melhor opção:</span> {best.sc.nome}
+                    <span className="muted">{comparavel ? "Recomendada:" : "Cenário:"}</span> {best.sc.nome}
                   </div>
                 )}
                 <div className="btn-row">

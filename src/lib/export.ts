@@ -4,7 +4,7 @@
  */
 import { analyse } from "./calc";
 import { PCT, R, fmtMoney, parseNum, prazoTxt } from "./format";
-import { avisos, cronograma, dataHora, descricaoValores, motivosMelhor, nomeArquivo, pendencias, rotuloDia } from "./report";
+import { avisos, cronograma, dataHora, descricaoValores, motivosMelhor, nomeArquivo, pendencias, ranking, rotuloDia } from "./report";
 import type { Projeto } from "./types";
 
 type RGB = [number, number, number];
@@ -18,6 +18,8 @@ const GOOD_SOFT: RGB = [225, 242, 232];
 const WARN: RGB = [154, 93, 0];
 const WARN_SOFT: RGB = [251, 239, 217];
 const TONE: Record<string, RGB> = { "Em análise": [226, 154, 0], Aprovado: GOOD, Reprovado: [200, 20, 27], Rascunho: [138, 134, 136] };
+
+const diasTxt = (n: number) => (n < 0.5 ? "à vista" : `${Math.round(n)} dias`);
 
 /** Logo oficial (SVG) rasterizado em PNG para caber no PDF/Excel. */
 async function logoPng(largura = 1000): Promise<{ dataUrl: string; w: number; h: number }> {
@@ -57,9 +59,12 @@ export async function exportarPdf(P: Projeto) {
   const autoTable = autoTableMod.default;
   const A = analyse(P);
   const cr = cronograma(P);
+  const rk = ranking(P);
   const hasC = parseNum(P.compl.valor) > 0;
+  const hasDireto = A.res.some((x) => x.sc.modal === "direto");
   const cn = P.compl.fornecedor || "Item complementar";
   const pisRate = P.regime === "real" ? P.pisReal : P.pisPres;
+  const taxaTxt = (A.taxa * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   const gerado = dataHora();
 
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4", compress: true });
@@ -69,11 +74,12 @@ export async function exportarPdf(P: Projeto) {
   const fill = (c: RGB) => doc.setFillColor(c[0], c[1], c[2]);
   const ink = (c: RGB) => doc.setTextColor(c[0], c[1], c[2]);
   const stroke = (c: RGB) => doc.setDrawColor(c[0], c[1], c[2]);
-
   const topBar = () => {
     fill(RED);
     doc.rect(0, 0, W, 6, "F");
   };
+  type WithTable = { lastAutoTable: { finalY: number } };
+  const fimTabela = () => (doc as unknown as WithTable).lastAutoTable.finalY;
 
   /* ---- cabeçalho da primeira página ---- */
   topBar();
@@ -96,7 +102,6 @@ export async function exportarPdf(P: Projeto) {
   ink(INK);
   const titulo = doc.splitTextToSize(P.nome || "Projeto", W - 2 * M - 130) as string[];
   doc.text(titulo[0], M, 124);
-  // etiqueta de status
   const tone = TONE[P.status] ?? GREY;
   doc.setFontSize(9);
   const sw = doc.getTextWidth(P.status) + 28;
@@ -143,35 +148,43 @@ export async function exportarPdf(P: Projeto) {
   });
   y += 58 + 18;
 
-  /* ---- melhor opção ---- */
+  const novaPagina = () => {
+    doc.addPage();
+    topBar();
+    y = 36;
+  };
+
+  /* ---- proposta recomendada ---- */
   const motivos = motivosMelhor(P);
-  if (A.best && motivos.length) {
-    const linhas: string[][] = motivos.map((m) => doc.splitTextToSize(`•  ${m.ressalva ? "Ressalva: " : ""}${m.texto}`, W - 2 * M - 40) as string[]);
+  const rec = A.recomendada;
+  if (rec && motivos.length) {
+    const limpa = rec.pendencias.length === 0;
+    const cor = limpa ? GOOD : WARN;
+    const linhas: string[][] = motivos.map((m) => doc.splitTextToSize(`•  ${m.ressalva ? "Atenção: " : ""}${m.texto}`, W - 2 * M - 40) as string[]);
     const hLinhas = linhas.reduce((s, l) => s + l.length * 12, 0);
-    const bh = 54 + hLinhas;
-    if (y + bh > H - 60) {
-      doc.addPage();
-      topBar();
-      y = 36;
-    }
-    fill(GOOD_SOFT);
+    const bh = 58 + hLinhas;
+    if (y + bh > H - 60) novaPagina();
+    fill(limpa ? GOOD_SOFT : WARN_SOFT);
     doc.roundedRect(M, y, W - 2 * M, bh, 6, 6, "F");
-    fill(GOOD);
+    fill(cor);
     doc.rect(M, y, 4, bh, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    ink(GOOD);
-    doc.text("MELHOR OPÇÃO", M + 18, y + 18, { charSpace: 1 });
+    ink(cor);
+    doc.text(limpa ? "PROPOSTA RECOMENDADA" : "MELHOR CUSTO, COM PENDÊNCIAS", M + 18, y + 18, { charSpace: 1 });
     doc.setFontSize(14);
     ink(INK);
-    doc.text(A.best.sc.nome, M + 18, y + 38);
+    doc.text(rec.sc.nome, M + 18, y + 38);
     doc.setFontSize(18);
-    ink(GOOD);
-    doc.text(R(A.best.liq), W - M - 16, y + 38, { align: "right" });
+    ink(cor);
+    doc.text(R(rec.vp), W - M - 16, y + 36, { align: "right" });
     doc.setFont("helvetica", "normal");
+    doc.setFontSize(7.5);
+    ink(GREY);
+    doc.text(`custo efetivo (valor presente a ${taxaTxt}% ao mês)`, W - M - 16, y + 48, { align: "right" });
     doc.setFontSize(9);
     ink(INK);
-    let ly = y + 58;
+    let ly = y + 64;
     linhas.forEach((l) => {
       doc.text(l, M + 18, ly);
       ly += l.length * 12;
@@ -183,11 +196,7 @@ export async function exportarPdf(P: Projeto) {
   for (const a of avisos(P)) {
     const l = doc.splitTextToSize(a.texto, W - 2 * M - 34) as string[];
     const bh = 14 + l.length * 12;
-    if (y + bh > H - 50) {
-      doc.addPage();
-      topBar();
-      y = 36;
-    }
+    if (y + bh > H - 50) novaPagina();
     const warn = a.tipo === "warn";
     fill(warn ? WARN_SOFT : SOFT);
     doc.rect(M, y, W - 2 * M, bh, "F");
@@ -200,13 +209,8 @@ export async function exportarPdf(P: Projeto) {
     y += bh + 6;
   }
 
-  /* ---- comparativo ---- */
-  const titulo2 = (t: string) => {
-    if (y > H - 130) {
-      doc.addPage();
-      topBar();
-      y = 36;
-    }
+  const titulo2 = (t: string, minimo = 130) => {
+    if (y > H - minimo) novaPagina();
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     ink(INK);
@@ -215,17 +219,70 @@ export async function exportarPdf(P: Projeto) {
     doc.rect(M, y + 20, 28, 3, "F");
     y += 34;
   };
-  y += 10;
-  titulo2("Comparativo");
+  const estiloTabela = {
+    theme: "plain" as const,
+    margin: { left: M, right: M, top: 40, bottom: 44 },
+    styles: { font: "helvetica", fontSize: 8, cellPadding: { top: 6, bottom: 6, left: 5, right: 5 }, textColor: INK, lineColor: LINE, lineWidth: { bottom: 0.6 }, valign: "middle" as const },
+    headStyles: { fillColor: INK, textColor: [255, 255, 255] as RGB, fontStyle: "bold" as const, fontSize: 7.5, lineWidth: 0 },
+    didDrawPage: () => topBar(),
+  };
 
-  const head = ["Cenário", "Modalidade", "Materiais", ...(hasC ? ["Item compl."] : []), "Total bruto", "ICMS", "PIS/COFINS", "Taxa fin.", "Valor líquido", "Cond. materiais", ...(hasC ? ["Cond. item compl."] : [])];
+  /* ---- análise das propostas (ranking) ---- */
+  if (rk.length > 1) {
+    novaPagina();
+    titulo2("Análise das propostas", 0);
+    autoTable(doc, {
+      ...estiloTabela,
+      startY: y,
+      head: [["#", "Proposta", "Valor líquido", "DIFAL", "Prazo médio", "Custo efetivo", "Diferença para a melhor"]],
+      body: rk.map((l) => [
+        String(l.pos),
+        [l.nome, [...l.selos, ...l.r.pendencias].join(" · "), prazoTxt(l.r.sc.prazoMat) + (hasC ? `  |  ${cn}: ${prazoTxt(l.r.sc.prazoCompl)}` : "")].filter(Boolean).join("\n"),
+        fmtMoney(l.r.liq),
+        l.difalTxt === "—" ? "—" : l.difalTxt.startsWith("R$") ? fmtMoney(l.r.difal) : l.difalTxt,
+        diasTxt(l.r.prazoMedio),
+        fmtMoney(l.r.vp),
+        l.dif < 0.005 ? "Menor custo" : `+ ${fmtMoney(l.dif)} (${PCT(l.difPct * 100)})`,
+      ]),
+      columnStyles: {
+        0: { cellWidth: 24, halign: "center" },
+        1: { cellWidth: 302 },
+        2: { cellWidth: 86, halign: "right" },
+        3: { cellWidth: 76, halign: "right" },
+        4: { cellWidth: 66, halign: "right" },
+        5: { cellWidth: 90, halign: "right", fontStyle: "bold" },
+        6: { cellWidth: 118, halign: "right" },
+      },
+      didParseCell: (d) => {
+        if (d.section !== "body") return;
+        const l = rk[d.row.index];
+        if (l.r === rec) d.cell.styles.fillColor = GOOD_SOFT;
+        if (d.column.index === 3 && l.r.difalStatus === "pendente") d.cell.styles.textColor = [200, 20, 27];
+        if (d.column.index === 6 && l.dif < 0.005) d.cell.styles.textColor = GOOD;
+      },
+    });
+    y = fimTabela() + 8;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    ink(GREY);
+    const nota = doc.splitTextToSize(
+      `Custo efetivo = valor líquido de cada parcela trazido a valor presente a ${taxaTxt}% ao mês (custo de capital; se não informado, usa a taxa financeira). Menor é melhor. Propostas com crédito em análise ou DIFAL não definido não são recomendadas até a pendência ser resolvida. Valores em R$.`,
+      W - 2 * M,
+    ) as string[];
+    doc.text(nota, M, y + 6);
+    y += 12 + nota.length * 10;
+  }
+
+  /* ---- comparativo detalhado ---- */
+  y += 8;
+  titulo2("Comparativo detalhado");
+  const head = ["Cenário", "Modalidade", "Materiais", ...(hasC ? ["Item compl."] : []), "Total bruto", "ICMS", "PIS/COFINS", "Taxa fin.", ...(hasDireto ? ["DIFAL"] : []), "Valor líquido", "Custo efetivo"];
+  const icmsIdx = 3 + (hasC ? 1 : 0) + 1;
   const dedCols = new Set<number>();
-  const base = 2 + 1 + (hasC ? 1 : 0) + 1; // índice da coluna ICMS (materiais=2, [item compl.], total bruto, ICMS)
-  const liqIdx = base + 3;
-  if (P.ded.icms) dedCols.add(base);
-  if (P.ded.pis) dedCols.add(base + 1);
-  if (P.ded.fin) dedCols.add(base + 2);
-  const bestIdx = A.best && A.res.length > 1 && A.best.liq > 0 ? A.res.indexOf(A.best) : -1;
+  if (P.ded.icms) dedCols.add(icmsIdx);
+  if (P.ded.pis) dedCols.add(icmsIdx + 1);
+  if (P.ded.fin) dedCols.add(icmsIdx + 2);
+  const liqIdx = icmsIdx + 3 + (hasDireto ? 1 : 0);
   const body = A.res.map((x, i) => {
     const pend = pendencias(x);
     return [
@@ -237,50 +294,46 @@ export async function exportarPdf(P: Projeto) {
       fmtMoney(x.icms),
       fmtMoney(x.pis),
       x.fin ? fmtMoney(x.fin) : "—",
+      ...(hasDireto ? [x.difalStatus === null ? "—" : x.difalStatus === "nos" ? fmtMoney(x.difal) : x.difalStatus === "cliente" ? "Do cliente" : "Não definido"] : []),
       fmtMoney(x.liq),
-      prazoTxt(x.sc.prazoMat),
-      ...(hasC ? [prazoTxt(x.sc.prazoCompl)] : []),
+      fmtMoney(x.vp),
     ];
   });
-  const right = (n: number) => ({ halign: "right" as const, cellWidth: n });
-  // larguras fixas (~756 pt de 762 úteis): os valores nunca quebram em duas linhas
-  const larg = hasC ? [108, 88, 66, 60, 66, 54, 58, 50, 68, 68, 70] : [150, 100, 76, 76, 62, 66, 60, 78, 88];
+  const larg = hasC
+    ? hasDireto
+      ? [112, 88, 64, 58, 64, 50, 54, 46, 56, 64, 70]
+      : [124, 96, 70, 64, 70, 56, 60, 52, 70, 80]
+    : hasDireto
+      ? [128, 96, 72, 72, 56, 60, 52, 60, 72, 80]
+      : [150, 104, 80, 80, 62, 66, 60, 78, 88];
   const colStyles: Record<number, object> = {};
   larg.forEach((w, c) => (colStyles[c] = { cellWidth: w, halign: c >= 2 ? "right" : "left" }));
-  void right;
+  const recIdx = A.comparavel && rec ? A.res.indexOf(rec) : -1;
   autoTable(doc, {
+    ...estiloTabela,
     startY: y,
     head: [head],
     body,
-    theme: "plain",
-    margin: { left: M, right: M, top: 40, bottom: 44 },
-    styles: { font: "helvetica", fontSize: 8, cellPadding: { top: 7, bottom: 7, left: 6, right: 6 }, textColor: INK, lineColor: LINE, lineWidth: { bottom: 0.6 }, valign: "middle" },
-    headStyles: { fillColor: INK, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.5, lineWidth: 0 },
     columnStyles: colStyles,
     didParseCell: (d) => {
       if (d.section !== "body") {
         if (d.section === "head" && dedCols.has(d.column.index)) d.cell.styles.fillColor = RED;
         return;
       }
-      if (d.row.index === bestIdx) {
-        d.cell.styles.fillColor = GOOD_SOFT;
-      }
+      if (d.row.index === recIdx) d.cell.styles.fillColor = GOOD_SOFT;
       if (dedCols.has(d.column.index)) d.cell.styles.textColor = [200, 20, 27];
-      if (d.column.index === liqIdx) d.cell.styles.fontStyle = "bold"; // valor líquido
+      if (d.column.index === liqIdx || d.column.index === liqIdx + 1) d.cell.styles.fontStyle = "bold";
     },
-    didDrawPage: () => topBar(),
   });
-  type WithTable = { lastAutoTable: { finalY: number } };
-  y = (doc as unknown as WithTable).lastAutoTable.finalY + 8;
+  y = fimTabela() + 8;
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   ink(GREY);
   doc.text(
     "Valores em R$." +
       (hasC ? ` Item compl. = ${cn}.` : "") +
-      (dedCols.size
-        ? " Colunas em vermelho foram retiradas do valor líquido (total bruto menos as deduções selecionadas)."
-        : " Valor líquido = total bruto (impostos e taxa financeira inclusos nos valores)."),
+      (dedCols.size ? " Colunas em vermelho foram retiradas do valor líquido." : "") +
+      " Valor líquido = total bruto menos as deduções selecionadas, mais o DIFAL quando por nossa conta.",
     M,
     y + 6,
   );
@@ -289,20 +342,16 @@ export async function exportarPdf(P: Projeto) {
   /* ---- cronograma ---- */
   titulo2("Cronograma de pagamentos (valores em R$)");
   autoTable(doc, {
+    ...estiloTabela,
     startY: y,
     head: [["Cenário", "Item", ...cr.cols.map(rotuloDia), "Total"]],
     body: cr.linhas.map((l) => [l.nome, l.item, ...cr.cols.map((d) => (l.parcelas[d] ? fmtMoney(l.parcelas[d]) : "—")), fmtMoney(l.total)]),
-    theme: "plain",
-    margin: { left: M, right: M, top: 40, bottom: 44 },
-    styles: { font: "helvetica", fontSize: 8, cellPadding: { top: 6, bottom: 6, left: 6, right: 6 }, textColor: INK, lineColor: LINE, lineWidth: { bottom: 0.6 }, valign: "middle" },
-    headStyles: { fillColor: INK, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 7.5, lineWidth: 0 },
     columnStyles: Object.fromEntries([...Array(cr.cols.length + 1).keys()].map((i) => [i + 2, { halign: "right" }])),
     didParseCell: (d) => {
       if (d.section !== "body") return;
       if (d.column.index === 1) d.cell.styles.textColor = d.row.raw && (d.row.raw as string[])[1] === "Materiais" ? RED : INK;
       if (d.column.index === cr.cols.length + 2) d.cell.styles.fontStyle = "bold";
     },
-    didDrawPage: () => topBar(),
   });
 
   /* ---- rodapé em todas as páginas ---- */
@@ -327,9 +376,11 @@ export async function exportarExcel(P: Projeto) {
   const ExcelJS = (ExcelMod as unknown as { default?: typeof import("exceljs") }).default ?? ExcelMod;
   const A = analyse(P);
   const cr = cronograma(P);
+  const rk = ranking(P);
   const hasC = parseNum(P.compl.valor) > 0;
   const cn = P.compl.fornecedor || "Item complementar";
   const n = A.res.length;
+  const taxaTxt = (A.taxa * 100).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Alpha Automação de Sistemas Elétricos";
@@ -347,18 +398,19 @@ export async function exportarExcel(P: Projeto) {
   const font = (o: object = {}) => ({ name: "Calibri", size: 11, color: { argb: C_INK }, ...o });
   const border = (argb = C_LINE) => ({ top: { style: "thin" as const, color: { argb } }, bottom: { style: "thin" as const, color: { argb } }, left: { style: "thin" as const, color: { argb } }, right: { style: "thin" as const, color: { argb } } });
   const solid = (argb: string) => ({ type: "pattern" as const, pattern: "solid" as const, fgColor: { argb } });
+  type WS = import("exceljs").Worksheet;
 
-  const setup = (ws: import("exceljs").Worksheet) => {
+  const setup = (ws: WS) => {
     ws.properties.tabColor = { argb: C_RED };
     ws.views = [{ showGridLines: false, state: "normal" }];
     ws.pageSetup = { orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, margins: { left: 0.4, right: 0.4, top: 0.5, bottom: 0.6, header: 0.3, footer: 0.3 } };
     ws.headerFooter = { oddFooter: '&L&"Calibri,Bold"Alpha Automação de Sistemas Elétricos&C&"Calibri"Cenários de Faturamento&R&"Calibri"Página &P de &N' };
   };
-  const band = (ws: import("exceljs").Worksheet, cols: number) => {
+  const band = (ws: WS, cols: number) => {
     ws.getRow(1).height = 8;
     for (let c = 1; c <= cols; c++) ws.getRow(1).getCell(c).fill = solid(C_RED);
   };
-  const secao = (ws: import("exceljs").Worksheet, row: number, texto: string, c1: number, c2: number) => {
+  const secao = (ws: WS, row: number, texto: string, c1: number, c2: number) => {
     ws.mergeCells(row, c1, row, c2);
     const c = ws.getCell(row, c1);
     c.value = texto;
@@ -367,11 +419,21 @@ export async function exportarExcel(P: Projeto) {
     c.alignment = { vertical: "middle", indent: 1 };
     ws.getRow(row).height = 22;
   };
+  const titulo = (ws: WS, cols: number, t: string, sub: string) => {
+    band(ws, cols);
+    ws.mergeCells(2, 1, 2, cols);
+    ws.getCell("A2").value = t;
+    ws.getCell("A2").font = font({ bold: true, size: 18 });
+    ws.getRow(2).height = 30;
+    ws.mergeCells(3, 1, 3, cols);
+    ws.getCell("A3").value = sub;
+    ws.getCell("A3").font = font({ size: 10.5, color: { argb: "FF625E60" } });
+  };
 
   /* ---------------- Resumo ---------------- */
   const rs = wb.addWorksheet("Resumo");
   setup(rs);
-  rs.columns = [{ width: 3 }, { width: 36 }, { width: 28 }, { width: 62 }, { width: 3 }];
+  rs.columns = [{ width: 3 }, { width: 38 }, { width: 28 }, { width: 62 }, { width: 3 }];
   band(rs, 5);
   rs.addImage(img, { tl: { col: 1, row: 1.2 }, ext: { width: 210, height: (210 * logo.h) / logo.w } });
   [2, 3, 4].forEach((r) => (rs.getRow(r).height = 17));
@@ -386,6 +448,8 @@ export async function exportarExcel(P: Projeto) {
   rs.getCell("B8").value = `${descricaoValores(P)}   ·   Gerado em ${dataHora()}`;
   rs.getCell("B8").font = font({ size: 10, color: { argb: "FF625E60" } });
 
+  // linhas dos parâmetros (as fórmulas do Comparativo apontam para estas células)
+  const R_ICMS = 11, R_PIS_APL = 15, R_FIN = 16, R_DED_ICMS = 17, R_DED_PIS = 18, R_DED_FIN = 19, R_CC = 20, R_COMPL = 25;
   secao(rs, 10, "PARÂMETROS DE CÁLCULO", 2, 4);
   const param = (row: number, rotulo: string, valor: string | number | { formula: string; result: number }, fmt: string | null, nota: string, editavel = true) => {
     rs.getCell(row, 2).value = rotulo;
@@ -396,8 +460,7 @@ export async function exportarExcel(P: Projeto) {
     c.font = font({ bold: true, color: { argb: editavel ? C_INK : "FF625E60" } });
     c.alignment = { horizontal: "right", vertical: "middle" };
     c.border = border();
-    if (editavel) c.fill = solid(C_EDIT);
-    else c.fill = solid(C_SOFT);
+    c.fill = solid(editavel ? C_EDIT : C_SOFT);
     const d = rs.getCell(row, 4);
     d.value = nota;
     d.font = font({ size: 10, color: { argb: "FF625E60" } });
@@ -405,60 +468,62 @@ export async function exportarExcel(P: Projeto) {
     rs.getRow(row).height = 21;
   };
   const pisAplicado = P.regime === "real" ? P.pisReal : P.pisPres;
-  const regimeTxt = P.regime === "real" ? "Lucro Real" : "Lucro Presumido";
-  param(11, "ICMS", P.icms / 100, "0.00%", "Percentual sobre o total bruto de cada cenário");
+  param(R_ICMS, "ICMS", P.icms / 100, "0.00%", "Percentual sobre o total bruto de cada cenário");
   param(12, "PIS/COFINS · Lucro Real", P.pisReal / 100, "0.00%", "Alíquota do regime não cumulativo");
   param(13, "PIS/COFINS · Lucro Presumido", P.pisPres / 100, "0.00%", "Alíquota do regime cumulativo");
-  param(14, "Regime em uso", regimeTxt, null, "Escolha na lista: define qual alíquota de PIS/COFINS é usada");
+  param(14, "Regime em uso", P.regime === "real" ? "Lucro Real" : "Lucro Presumido", null, "Escolha na lista: define qual alíquota de PIS/COFINS é usada");
   rs.getCell("C14").dataValidation = { type: "list", allowBlank: false, formulae: ['"Lucro Real,Lucro Presumido"'] };
-  param(15, "PIS/COFINS aplicado", { formula: 'IF(C14="Lucro Real",C12,C13)', result: pisAplicado / 100 }, "0.00%", "Calculado automaticamente a partir do regime", false);
-  param(16, "Taxa financeira", P.taxaFin / 100, "0.00%", "Aplicada só às partes pagas a prazo (à vista = sem taxa)");
+  param(R_PIS_APL, "PIS/COFINS aplicado", { formula: 'IF(C14="Lucro Real",C12,C13)', result: pisAplicado / 100 }, "0.00%", "Calculado automaticamente a partir do regime", false);
+  param(R_FIN, "Taxa financeira", P.taxaFin / 100, "0.00%", "Aplicada só à parte paga a prazo (entrada e à vista = sem taxa)");
   const simNao = (b: boolean) => (b ? "Sim" : "Não");
-  param(17, "Retirar ICMS do valor líquido", simNao(P.ded.icms), null, "Sim = o ICMS é descontado do valor líquido");
-  param(18, "Retirar PIS/COFINS do valor líquido", simNao(P.ded.pis), null, "Sim = o PIS/COFINS é descontado do valor líquido");
-  param(19, "Retirar taxa financeira do valor líquido", simNao(P.ded.fin), null, "Sim = a taxa financeira é descontada do valor líquido");
-  ["C17", "C18", "C19"].forEach((a) => (rs.getCell(a).dataValidation = { type: "list", allowBlank: false, formulae: ['"Sim,Não"'] }));
+  param(R_DED_ICMS, "Retirar ICMS do valor líquido", simNao(P.ded.icms), null, "Sim = o ICMS é descontado do valor líquido");
+  param(R_DED_PIS, "Retirar PIS/COFINS do valor líquido", simNao(P.ded.pis), null, "Sim = o PIS/COFINS é descontado do valor líquido");
+  param(R_DED_FIN, "Retirar taxa financeira do valor líquido", simNao(P.ded.fin), null, "Sim = a taxa financeira é descontada do valor líquido");
+  [R_DED_ICMS, R_DED_PIS, R_DED_FIN].forEach((r) => (rs.getCell(r, 3).dataValidation = { type: "list", allowBlank: false, formulae: ['"Sim,Não"'] }));
+  param(R_CC, "Custo de capital (ao mês)", A.taxa, "0.00%", "Usado só no custo efetivo (valor presente); se vazio na ferramenta, usa a taxa financeira", false);
 
-  secao(rs, 21, "ITEM COMPLEMENTAR (somado a todos os cenários)", 2, 4);
-  param(22, "Fornecedor", P.compl.fornecedor || "—", null, "");
-  rs.getCell("C22").alignment = { horizontal: "left", indent: 1 };
-  param(23, "Descrição", P.compl.descricao || "—", null, "");
-  rs.getCell("C23").alignment = { horizontal: "left", indent: 1, wrapText: true };
-  param(24, "Valor", parseNum(P.compl.valor), BRL, "Valor 0 desativa o item complementar");
+  secao(rs, 22, "ITEM COMPLEMENTAR (somado a todos os cenários)", 2, 4);
+  param(23, "Fornecedor", P.compl.fornecedor || "—", null, "");
+  rs.getCell("C23").alignment = { horizontal: "left", indent: 1 };
+  param(24, "Descrição", P.compl.descricao || "—", null, "");
+  rs.getCell("C24").alignment = { horizontal: "left", indent: 1, wrapText: true };
+  param(R_COMPL, "Valor", parseNum(P.compl.valor), BRL, "Valor 0 desativa o item complementar");
 
-  let r = 26;
+  let r = 27;
   const motivos = motivosMelhor(P);
+  const rec = A.recomendada;
   const first = 6;
   const last = first + n - 1;
-  if (A.best && motivos.length) {
-    secao(rs, r++, "MELHOR OPÇÃO", 2, 4);
-    rs.getCell(r, 2).value = "Cenário";
+  if (rec && motivos.length) {
+    const limpa = rec.pendencias.length === 0;
+    secao(rs, r++, limpa ? "PROPOSTA RECOMENDADA" : "MELHOR CUSTO, COM PENDÊNCIAS", 2, 4);
+    rs.getCell(r, 2).value = "Proposta";
     rs.getCell(r, 2).font = font({ bold: true });
-    const c1 = rs.getCell(r, 3);
     rs.mergeCells(r, 3, r, 4);
-    c1.value = { formula: `INDEX(Comparativo!$B$${first}:$B$${last},MATCH(MIN(Comparativo!$J$${first}:$J$${last}),Comparativo!$J$${first}:$J$${last},0))`, result: A.best.sc.nome };
-    c1.font = font({ bold: true, size: 13, color: { argb: "FF1E7A4C" } });
-    c1.fill = solid(C_GOOD);
+    const c1 = rs.getCell(r, 3);
+    c1.value = rec.sc.nome;
+    c1.font = font({ bold: true, size: 13, color: { argb: limpa ? "FF1E7A4C" : "FF9A5D00" } });
+    c1.fill = solid(limpa ? C_GOOD : C_WARN);
     c1.alignment = { indent: 1, vertical: "middle" };
     rs.getRow(r).height = 24;
     r++;
-    rs.getCell(r, 2).value = "Menor valor líquido";
+    rs.getCell(r, 2).value = `Custo efetivo (valor presente a ${taxaTxt}% a.m.)`;
     rs.getCell(r, 2).font = font({ bold: true });
     const c2 = rs.getCell(r, 3);
-    c2.value = { formula: `MIN(Comparativo!$J$${first}:$J$${last})`, result: A.best.liq };
+    c2.value = rec.vp;
     c2.numFmt = BRL;
-    c2.font = font({ bold: true, size: 13, color: { argb: "FF1E7A4C" } });
-    c2.fill = solid(C_GOOD);
+    c2.font = font({ bold: true, size: 13, color: { argb: limpa ? "FF1E7A4C" : "FF9A5D00" } });
+    c2.fill = solid(limpa ? C_GOOD : C_WARN);
     c2.alignment = { horizontal: "right", vertical: "middle" };
     rs.getRow(r).height = 24;
     r++;
     motivos.forEach((m) => {
       rs.mergeCells(r, 2, r, 4);
       const c = rs.getCell(r, 2);
-      c.value = `•  ${m.ressalva ? "Ressalva: " : ""}${m.texto}`;
+      c.value = `•  ${m.ressalva ? "Atenção: " : ""}${m.texto}`;
       c.font = font({ size: 10.5, bold: m.ressalva });
       c.alignment = { wrapText: true, vertical: "middle", indent: 1 };
-      rs.getRow(r).height = 18;
+      rs.getRow(r).height = Math.max(18, Math.ceil(m.texto.length / 105) * 15 + 4);
       r++;
     });
     r++;
@@ -479,41 +544,90 @@ export async function exportarExcel(P: Projeto) {
     r++;
   }
   rs.mergeCells(r, 2, r, 4);
-  rs.getCell(r, 2).value = "Dica: altere as células com fundo rosa (alíquotas, regime, deduções, valores) e a aba Comparativo recalcula sozinha.";
+  rs.getCell(r, 2).value = "Dica: altere as células com fundo rosa (alíquotas, regime, deduções) e a aba Comparativo recalcula o valor líquido sozinha. Prazo médio e custo efetivo são calculados pela ferramenta.";
   rs.getCell(r, 2).font = font({ size: 9.5, italic: true, color: { argb: "FF625E60" } });
+  rs.getCell(r, 2).alignment = { wrapText: true, vertical: "middle" };
+  rs.getRow(r).height = 28;
+
+  /* ---------------- Análise ---------------- */
+  if (rk.length) {
+    const an = wb.addWorksheet("Análise");
+    setup(an);
+    an.columns = [{ width: 5 }, { width: 38 }, { width: 30 }, { width: 19 }, { width: 18 }, { width: 14 }, { width: 20 }, { width: 18 }, { width: 11 }, { width: 24 }, { width: 38 }];
+    titulo(an, 11, "Análise das propostas", `${P.nome || "Projeto"}   |   Ranking por custo efetivo (valor presente a ${taxaTxt}% ao mês). Menor é melhor.`);
+    const ah = an.getRow(5);
+    ah.height = 30;
+    ["#", "Proposta", "Selos", "Valor líquido", "DIFAL", "Prazo médio (dias)", "Custo efetivo (VP)", "Diferença para a melhor", "Dif. %", "Pendências", "Condição de pagamento"].forEach((h, i) => {
+      const c = ah.getCell(i + 1);
+      c.value = h;
+      c.font = font({ bold: true, size: 10, color: { argb: "FFFFFFFF" } });
+      c.fill = solid(C_INK);
+      c.alignment = { horizontal: i >= 3 && i <= 8 ? "right" : "left", vertical: "middle", wrapText: true, indent: 1 };
+    });
+    rk.forEach((l, i) => {
+      const row = 6 + i;
+      const rr = an.getRow(row);
+      rr.height = 24;
+      const vals: (string | number)[] = [
+        l.pos,
+        l.nome,
+        l.selos.join(" · ") || "—",
+        l.r.liq,
+        l.r.difalStatus === null ? "—" : l.r.difalStatus === "nos" ? l.r.difal : l.r.difalStatus === "cliente" ? "Do cliente" : "Não definido",
+        Math.round(l.r.prazoMedio * 10) / 10,
+        l.r.vp,
+        l.dif,
+        l.difPct,
+        pendencias(l.r) || "—",
+        prazoTxt(l.r.sc.prazoMat) + (hasC ? `  |  ${cn}: ${prazoTxt(l.r.sc.prazoCompl)}` : ""),
+      ];
+      vals.forEach((v, k) => {
+        const c = rr.getCell(k + 1);
+        c.value = v;
+        c.border = border();
+        c.font = font({ size: 10.5, bold: k === 1 || k === 6 });
+        c.alignment = { vertical: "middle", horizontal: k === 0 ? "center" : k >= 3 && k <= 8 ? "right" : "left", indent: 1, wrapText: k === 10 };
+        if (k === 3 || k === 6 || k === 7 || (k === 4 && typeof v === "number")) c.numFmt = BRL;
+        if (k === 8) c.numFmt = "0.00%";
+        if (l.r === rec) c.fill = solid(C_GOOD);
+      });
+      if (l.r.difalStatus === "pendente") rr.getCell(5).font = font({ size: 10.5, bold: true, color: { argb: C_RED } });
+      if (l.r.pendencias.length) rr.getCell(10).font = font({ size: 10.5, bold: true, color: { argb: "FF9A5D00" } });
+    });
+    const nr = 6 + rk.length + 1;
+    an.mergeCells(nr, 1, nr, 11);
+    an.getCell(nr, 1).value = `Custo efetivo = valor líquido de cada parcela trazido a valor presente a ${taxaTxt}% ao mês (custo de capital; se não informado, usa a taxa financeira). Propostas com crédito em análise ou DIFAL não definido não são recomendadas até a pendência ser resolvida.`;
+    an.getCell(nr, 1).font = font({ size: 9.5, italic: true, color: { argb: "FF625E60" } });
+    an.getCell(nr, 1).alignment = { wrapText: true, vertical: "top" };
+    an.getRow(nr).height = 30;
+    an.views = [{ showGridLines: false, state: "frozen", xSplit: 2, ySplit: 5 }];
+  }
 
   /* ---------------- Comparativo ---------------- */
   const cp = wb.addWorksheet("Comparativo");
   setup(cp);
   cp.columns = [
-    { width: 5 }, { width: 36 }, { width: 20 }, { width: 18 }, { width: 18 }, { width: 18 }, { width: 16 }, { width: 16 }, { width: 16 }, { width: 19 }, { width: 18 }, { width: 18 }, { width: 11 }, { width: 28 },
+    { width: 5 }, { width: 36 }, { width: 20 }, { width: 17 }, { width: 17 }, { width: 17 }, { width: 15 }, { width: 15 }, { width: 17 }, { width: 15 }, { width: 15 }, { width: 19 }, { width: 13 }, { width: 19 }, { width: 24 }, { width: 24 }, { width: 14 }, { width: 11 }, { width: 28 },
   ];
-  band(cp, 14);
-  cp.mergeCells("A2:N2");
-  cp.getCell("A2").value = "Comparativo de cenários";
-  cp.getCell("A2").font = font({ bold: true, size: 18 });
-  cp.getRow(2).height = 30;
-  cp.mergeCells("A3:N3");
-  cp.getCell("A3").value = `${P.nome || "Projeto"}${P.cliente ? "  ·  " + P.cliente : ""}${P.ufCliente ? " (" + P.ufCliente + ")" : ""}   |   ${descricaoValores(P)}`;
-  cp.getCell("A3").font = font({ size: 10.5, color: { argb: "FF625E60" } });
-  const heads = ["#", "Cenário", "Modalidade", "Materiais", cn, "Total bruto", "ICMS", "PIS/COFINS", "Taxa financeira", "Valor líquido", "Cond. materiais", `Cond. ${cn}`, "Crédito", "Pendências"];
+  titulo(cp, 19, "Comparativo de cenários", `${P.nome || "Projeto"}${P.cliente ? "  ·  " + P.cliente : ""}${P.ufCliente ? " (" + P.ufCliente + ")" : ""}   |   ${descricaoValores(P)}`);
+  const heads = ["#", "Cenário", "Modalidade", "Materiais", cn, "Total bruto", "ICMS", "PIS/COFINS", "Parte paga a prazo", "Taxa financeira", "DIFAL (nosso)", "Valor líquido", "Prazo médio (dias)", "Custo efetivo (VP)", "Cond. materiais", `Cond. ${cn}`, "DIFAL", "Crédito", "Pendências"];
   const hr = cp.getRow(5);
-  hr.height = 28;
+  hr.height = 30;
   heads.forEach((h, i) => {
     const c = hr.getCell(i + 1);
     c.value = h;
     c.font = font({ bold: true, size: 10, color: { argb: "FFFFFFFF" } });
     c.fill = solid(C_INK);
-    c.alignment = { horizontal: i >= 3 && i <= 9 ? "right" : "left", vertical: "middle", wrapText: true, indent: 1 };
+    c.alignment = { horizontal: i >= 3 && i <= 13 ? "right" : "left", vertical: "middle", wrapText: true, indent: 1 };
   });
   const T = "Resumo!";
   A.res.forEach((x, i) => {
     const row = first + i;
     const rr = cp.getRow(row);
     rr.height = 22;
-    const pendTxt = pendencias(x);
     const taxa = P.taxaFin / 100;
-    const finV = (x.pMat.length ? x.mat * taxa : 0) + (x.C && x.pCompl.length ? x.C * taxa : 0);
+    const aPrazo = [...x.parcMat, ...x.parcCompl].filter((p) => p.dia > 0).reduce((s, p) => s + p.valor, 0);
+    const finV = aPrazo * taxa;
     const bruto = x.mat + x.C;
     const icmsV = (bruto * P.icms) / 100;
     const pisV = (bruto * pisAplicado) / 100;
@@ -521,62 +635,71 @@ export async function exportarExcel(P: Projeto) {
     if (P.ded.icms) liq -= icmsV;
     if (P.ded.pis) liq -= pisV;
     if (P.ded.fin) liq -= finV;
+    liq += x.difal;
     const vals: (string | number | { formula: string; result: number })[] = [
       i + 1,
       x.sc.nome,
       x.sc.modal === "direto" ? "Direto ao cliente" : "Via Alpha Filial",
       x.mat,
-      { formula: `${T}$C$24`, result: x.C },
+      { formula: `${T}$C$${R_COMPL}`, result: x.C },
       { formula: `D${row}+E${row}`, result: bruto },
-      { formula: `F${row}*${T}$C$11`, result: icmsV },
-      { formula: `F${row}*${T}$C$15`, result: pisV },
-      { formula: `IF(K${row}<>"À vista",D${row}*${T}$C$16,0)+IF(AND(E${row}>0,L${row}<>"À vista"),E${row}*${T}$C$16,0)`, result: finV },
-      { formula: `F${row}-IF(${T}$C$17="Sim",G${row},0)-IF(${T}$C$18="Sim",H${row},0)-IF(${T}$C$19="Sim",I${row},0)`, result: liq },
+      { formula: `F${row}*${T}$C$${R_ICMS}`, result: icmsV },
+      { formula: `F${row}*${T}$C$${R_PIS_APL}`, result: pisV },
+      aPrazo,
+      { formula: `I${row}*${T}$C$${R_FIN}`, result: finV },
+      x.difal,
+      { formula: `F${row}-IF(${T}$C$${R_DED_ICMS}="Sim",G${row},0)-IF(${T}$C$${R_DED_PIS}="Sim",H${row},0)-IF(${T}$C$${R_DED_FIN}="Sim",J${row},0)+K${row}`, result: liq },
+      Math.round(x.prazoMedio * 10) / 10,
+      x.vp,
       prazoTxt(x.sc.prazoMat),
       prazoTxt(x.sc.prazoCompl),
+      x.difalStatus === null ? "—" : x.difalStatus === "pendente" ? "Não definido" : x.difalStatus === "cliente" ? "Do cliente" : "Por nossa conta",
       x.sc.credito ? "Em análise" : "—",
-      pendTxt || "—",
+      pendencias(x) || "—",
     ];
     vals.forEach((v, k) => {
       const c = rr.getCell(k + 1);
       c.value = v as never;
-      c.font = font({ size: 10.5, bold: k === 9 || k === 1 });
+      c.font = font({ size: 10.5, bold: k === 11 || k === 13 || k === 1 });
       c.border = border();
-      c.alignment = { vertical: "middle", horizontal: k >= 3 && k <= 9 ? "right" : "left", indent: k >= 3 && k <= 9 ? 1 : 1 };
-      if (k >= 3 && k <= 9) c.numFmt = BRL;
-      if (k === 0) c.alignment = { vertical: "middle", horizontal: "center" };
+      c.alignment = { vertical: "middle", horizontal: k === 0 ? "center" : k >= 3 && k <= 13 ? "right" : "left", indent: 1 };
+      if ((k >= 3 && k <= 11) || k === 13) c.numFmt = BRL;
+      if (k === 12) c.numFmt = "0.0";
     });
-    // colunas que são retiradas do valor líquido ficam em vermelho
     if (P.ded.icms) rr.getCell(7).font = font({ size: 10.5, color: { argb: C_RED } });
     if (P.ded.pis) rr.getCell(8).font = font({ size: 10.5, color: { argb: C_RED } });
-    if (P.ded.fin) rr.getCell(9).font = font({ size: 10.5, color: { argb: C_RED } });
-    if (x.sc.credito || x.sc.modal === "direto") rr.getCell(14).font = font({ size: 10.5, bold: true, color: { argb: "FF9A5D00" } });
-    if (i % 2 === 1) for (let k = 1; k <= 14; k++) if (!rr.getCell(k).fill || (rr.getCell(k).fill as { type?: string }).type !== "pattern") rr.getCell(k).fill = solid("FFFBFBFB");
+    if (P.ded.fin) rr.getCell(10).font = font({ size: 10.5, color: { argb: C_RED } });
+    if (x.difalStatus === "pendente") rr.getCell(17).font = font({ size: 10.5, bold: true, color: { argb: C_RED } });
+    if (x.pendencias.length) rr.getCell(19).font = font({ size: 10.5, bold: true, color: { argb: "FF9A5D00" } });
+    if (i % 2 === 1) for (let k = 1; k <= 19; k++) rr.getCell(k).fill = solid("FFFBFBFB");
   });
   if (!hasC) {
     cp.getColumn(5).hidden = true;
-    cp.getColumn(12).hidden = true;
+    cp.getColumn(16).hidden = true;
   }
   if (n > 1) {
     cp.addConditionalFormatting({
-      ref: `A${first}:N${last}`,
-      rules: [{ type: "expression", formulae: [`$J${first}=MIN($J$${first}:$J$${last})`], priority: 1, style: { fill: { type: "pattern", pattern: "solid", bgColor: { argb: C_GOOD } }, font: { bold: true, color: { argb: "FF17653E" } } } }],
+      ref: `A${first}:S${last}`,
+      rules: [{ type: "expression", formulae: [`$N${first}=MIN($N$${first}:$N$${last})`], priority: 1, style: { fill: { type: "pattern", pattern: "solid", bgColor: { argb: C_GOOD } }, font: { bold: true, color: { argb: "FF17653E" } } } }],
     });
     const tr = cp.getRow(last + 2);
     tr.height = 24;
-    cp.mergeCells(last + 2, 1, last + 2, 9);
+    cp.mergeCells(last + 2, 1, last + 2, 13);
     const lab = tr.getCell(1);
-    lab.value = "Menor valor líquido entre os cenários";
+    lab.value = "Menor custo efetivo entre os cenários";
     lab.font = font({ bold: true });
     lab.alignment = { horizontal: "right", vertical: "middle", indent: 1 };
-    const tv = tr.getCell(10);
-    tv.value = { formula: `MIN(J${first}:J${last})`, result: A.best?.liq ?? 0 };
+    const tv = tr.getCell(14);
+    tv.value = { formula: `MIN(N${first}:N${last})`, result: A.best?.vp ?? 0 };
     tv.numFmt = BRL;
     tv.font = font({ bold: true, size: 12, color: { argb: "FF17653E" } });
     tv.fill = solid(C_GOOD);
     tv.alignment = { horizontal: "right", vertical: "middle", indent: 1 };
     tv.border = border();
   }
+  cp.mergeCells(last + 4, 1, last + 4, 19);
+  cp.getCell(last + 4, 1).value = `Prazo médio e custo efetivo são calculados pela ferramenta (valor presente a ${taxaTxt}% ao mês) e não recalculam ao editar a planilha. O valor líquido recalcula a partir da aba Resumo.`;
+  cp.getCell(last + 4, 1).font = font({ size: 9.5, italic: true, color: { argb: "FF625E60" } });
   cp.views = [{ showGridLines: false, state: "frozen", xSplit: 2, ySplit: 5 }];
   cp.pageSetup.printTitlesRow = "5:5";
 
@@ -585,14 +708,7 @@ export async function exportarExcel(P: Projeto) {
   setup(cg);
   const nCols = 2 + cr.cols.length + 1;
   cg.columns = [{ width: 38 }, { width: 22 }, ...cr.cols.map(() => ({ width: 17 })), { width: 19 }];
-  band(cg, nCols);
-  cg.mergeCells(2, 1, 2, nCols);
-  cg.getCell("A2").value = "Cronograma de pagamentos";
-  cg.getCell("A2").font = font({ bold: true, size: 18 });
-  cg.getRow(2).height = 30;
-  cg.mergeCells(3, 1, 3, nCols);
-  cg.getCell("A3").value = `${P.nome || "Projeto"}   |   Parcelas iguais nos prazos informados (D0 = à vista)`;
-  cg.getCell("A3").font = font({ size: 10.5, color: { argb: "FF625E60" } });
+  titulo(cg, nCols, "Cronograma de pagamentos", `${P.nome || "Projeto"}   |   Parcelas conforme a condição de cada cenário (D0 = à vista)`);
   const ch = cg.getRow(5);
   ch.height = 28;
   ["Cenário", "Item", ...cr.cols.map(rotuloDia), "Total"].forEach((h, i) => {
@@ -619,7 +735,6 @@ export async function exportarExcel(P: Projeto) {
       if (k >= 2 && v === null) c.font = font({ size: 10.5, color: { argb: "FFB5B2B3" } });
       if (k === vals.length - 1) c.fill = solid(C_SOFT);
     });
-    if (cr.hasC ? i % 2 === 1 : false) rr.getCell(1).fill = solid("FFFBFBFB");
   });
   cg.views = [{ showGridLines: false, state: "frozen", xSplit: 2, ySplit: 5 }];
 
